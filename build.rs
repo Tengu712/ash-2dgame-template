@@ -1,109 +1,121 @@
 use std::{
+    collections::HashMap,
     env,
     fs::{self, File},
-    path::{Path, PathBuf},
-    process::Command,
+    path::Path,
+    process::{Command, Stdio},
 };
 
-const VULKAN_HEADERS_DEP: Dependency = Dependency {
-    path: "deps/Vulkan-Headers",
-    url: "https://github.com/KhronosGroup/Vulkan-Headers.git",
-    sha: "450bd2232225d6c7728a4108055ac2e37cef6475",
-};
-const VULKAN_LOADER_DEP: Dependency = Dependency {
-    path: "deps/Vulkan-Loader",
-    url: "https://github.com/KhronosGroup/Vulkan-Loader.git",
-    sha: "7a07afe04ad134d4eabe25f62720177f60ed6627",
-};
+const CONAN_PROFILE_COMMANDS: &[&str] = &["conan", "profile", "detect", "--exist-ok"];
+const CONAN_INSTALL_COMMANDS: &[&str] = &[
+    "conan",
+    "install",
+    ".",
+    "--output-folder",
+    "./deps",
+    "--build=missing",
+    "-s",
+    "build_type=Release",
+    "-s",
+    "compiler.cppstd=17",
+    "-c",
+    "tools.cmake.cmaketoolchain:generator=Ninja",
+];
 
-struct Dependency {
-    path: &'static str,
-    url: &'static str,
-    sha: &'static str,
+fn is_command_available(command: &str) -> bool {
+    Command::new(command)
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
-impl Dependency {
-    fn get_path(&self) -> PathBuf {
-        env::current_dir().unwrap().join(self.path)
-    }
-
-    fn get_install_path(&self) -> PathBuf {
-        self.get_path().join("installed")
-    }
-
-    fn clone_if_needed(&self) {
-        let path = self.get_path();
-        if path.exists() {
-            return;
-        }
-
-        fs::create_dir_all(&path).unwrap();
-        run(&path, "git", &["init"]);
-        run(&path, "git", &["remote", "add", "origin", self.url]);
-        run(&path, "git", &["fetch", "--depth", "1", "origin", self.sha]);
-        run(&path, "git", &["checkout", "FETCH_HEAD"]);
-    }
-
-    fn build_if_needed(&self, cmake_add_flags: &[&str]) {
-        let path = self.get_path();
-        let install_path = self.get_install_path();
-        let stamp_path = install_path.join(".stamp");
-        if stamp_path.exists() {
-            return;
-        }
-
-        let build_path = path.join("build");
-        if !build_path.exists() {
-            fs::create_dir_all(&build_path).unwrap();
-        }
-
-        let install_prefix = format!("-DCMAKE_INSTALL_PREFIX={}", install_path.display());
-        let mut build_flags = vec![
-            "..",
-            "-G",
-            "Ninja",
-            "-DCMAKE_BUILD_TYPE=Release",
-            &install_prefix,
-        ];
-        build_flags.extend_from_slice(cmake_add_flags);
-
-        run(&build_path, "cmake", &build_flags);
-        run(
-            &build_path,
-            "cmake",
-            &["--build", ".", "--config", "Release"],
-        );
-        run(&build_path, "cmake", &["--install", "."]);
-        File::create(stamp_path).unwrap();
-    }
-}
-
-fn run(current_dir: &Path, command: &str, args: &[&str]) {
+fn run(command: &str, args: &[&str]) {
     let status = Command::new(command)
-        .current_dir(current_dir)
         .args(args)
+        .env("CARGO_PROFILE", env::var("PROFILE").unwrap())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .status()
         .unwrap();
     assert!(status.success());
 }
 
+fn install_dependencies() {
+    let path = Path::new("deps/.stamp");
+    if path.exists() {
+        return;
+    }
+
+    if is_command_available("conan") {
+        run(CONAN_PROFILE_COMMANDS[0], &CONAN_PROFILE_COMMANDS[1..]);
+        run(CONAN_INSTALL_COMMANDS[0], &CONAN_INSTALL_COMMANDS[1..]);
+    } else if is_command_available("uv") {
+        run("uv", &[&["tool", "run"], CONAN_PROFILE_COMMANDS].concat());
+        run("uv", &[&["tool", "run"], CONAN_INSTALL_COMMANDS].concat());
+    } else {
+        panic!("you must install conan or uv for installing dependencies.");
+    }
+    File::create(path).unwrap();
+}
+
+fn parse_config() -> HashMap<String, String> {
+    fs::read_to_string("deps/conan-paths.txt")
+        .unwrap()
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() {
+                return None;
+            }
+            line.split_once('=')
+                .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
+        })
+        .collect()
+}
+
 fn print_link_info() {
-    let lib_path = VULKAN_LOADER_DEP.get_install_path().join("lib");
-    println!("cargo:rustc-link-search=native={}", lib_path.display());
+    let config = parse_config();
+    println!(
+        "cargo:rustc-link-search=native={}",
+        config.get("VULKAN_LIB").unwrap()
+    );
     #[cfg(windows)]
     println!("cargo:rustc-link-lib=vulkan-1");
     #[cfg(not(windows))]
     println!("cargo:rustc-link-lib=vulkan");
 }
 
+fn generate_cargo_config() {
+    if env::var("PROFILE").unwrap() != "debug" {
+        let _ = fs::remove_file(".cargo/config.toml");
+        return;
+    }
+
+    let config = parse_config();
+    let vvl_json = config.get("VVL_JSON").unwrap();
+    let vvl_bin = config.get("VVL_BIN").unwrap();
+
+    let cargo_config = format!(
+        r#"
+[env]
+VK_LAYER_PATH = {{ value = "{}", force = true }}
+DYLD_LIBRARY_PATH = {{ value = "{}", force = true }}
+LD_LIBRARY_PATH = {{ value = "{}", force = true }}
+        "#,
+        vvl_json.replace('\\', "/"),
+        vvl_bin.replace('\\', "/"),
+        vvl_bin.replace('\\', "/"),
+    );
+
+    fs::create_dir_all(".cargo").unwrap();
+    fs::write(".cargo/config.toml", cargo_config).unwrap();
+}
+
 fn main() {
-    VULKAN_HEADERS_DEP.clone_if_needed();
-    VULKAN_LOADER_DEP.clone_if_needed();
-    VULKAN_HEADERS_DEP.build_if_needed(&[]);
-    VULKAN_LOADER_DEP.build_if_needed(&[&format!(
-        "-DVULKAN_HEADERS_INSTALL_DIR={}",
-        VULKAN_HEADERS_DEP.get_install_path().display()
-    )]);
+    install_dependencies();
     print_link_info();
+    generate_cargo_config();
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=conanfile.py");
 }
