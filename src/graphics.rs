@@ -18,10 +18,7 @@ pub struct GraphicsEngine {
 
 impl GraphicsEngine {
     pub fn new() -> Self {
-        let entry = unsafe {
-            Entry::load()
-                .expect("failed to load Vulkan loader.\nPlease verify that Vulkan is available on your system.")
-        };
+        let entry = Entry::linked();
         let ctx = Context::new(&entry, APPLICATION_NAME, APPLICATION_VERSION);
         Self { ctx, entry }
     }
