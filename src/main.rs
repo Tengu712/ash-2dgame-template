@@ -1,8 +1,8 @@
 mod graphics;
+mod settings;
 
 use graphics::GraphicsEngine;
 
 fn main() {
-    let entry = graphics::create_entry();
-    let _ = GraphicsEngine::new(&entry, c"ash-2dgame-template", 0);
+    let _ = GraphicsEngine::new();
 }

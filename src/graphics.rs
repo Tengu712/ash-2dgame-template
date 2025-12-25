@@ -1,25 +1,28 @@
+use crate::settings::*;
 use ash::Entry;
-use std::ffi::CStr;
 
 mod context;
 
 use context::Context;
 
-pub fn create_entry() -> Entry {
-    unsafe {
-        Entry::load().expect(
-            "failed to load Vulkan loader.\nPlease verify that Vulkan is available on your system.",
-        )
-    }
-}
-
+/// アプリケーションのグラフィックスを司るオブジェクト群
+///
+/// WARN: 1アプリケーション上で1インスタンスのみ作成すること。
 pub struct GraphicsEngine {
     ctx: Context,
+
+    // NOTE: 上記オブジェクトより先にdropするとACCESS VIOLATIONが発生するので、
+    //       上記オブジェクトより後にdropするために最後に宣言する。
+    entry: Entry,
 }
 
 impl GraphicsEngine {
-    pub fn new(entry: &Entry, app_name: &CStr, app_version: u32) -> Self {
-        let ctx = Context::new(entry, app_name, app_version);
-        Self { ctx }
+    pub fn new() -> Self {
+        let entry = unsafe {
+            Entry::load()
+                .expect("failed to load Vulkan loader.\nPlease verify that Vulkan is available on your system.")
+        };
+        let ctx = Context::new(&entry, APPLICATION_NAME, APPLICATION_VERSION);
+        Self { ctx, entry }
     }
 }

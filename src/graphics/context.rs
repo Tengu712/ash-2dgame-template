@@ -12,21 +12,19 @@ pub struct Context {
 impl Context {
     pub fn new(entry: &Entry, app_name: &CStr, app_version: u32) -> Self {
         unsafe {
-            let instance = {
-                let ai = vk::ApplicationInfo {
-                    p_application_name: app_name.as_ptr(),
-                    application_version: app_version,
-                    api_version: vk::make_api_version(0, 1, 0, 0),
-                    ..Default::default()
-                };
-                let ci = vk::InstanceCreateInfo {
-                    p_application_info: &ai,
-                    ..Default::default()
-                };
-                entry
-                    .create_instance(&ci, None)
-                    .expect("failed to create a Vulkan instance.")
+            let ai = vk::ApplicationInfo {
+                p_application_name: app_name.as_ptr(),
+                application_version: app_version,
+                api_version: vk::make_api_version(0, 1, 0, 0),
+                ..Default::default()
             };
+            let ci = vk::InstanceCreateInfo {
+                p_application_info: &ai,
+                ..Default::default()
+            };
+            let instance = entry
+                .create_instance(&ci, None)
+                .expect("failed to create a Vulkan instance.");
 
             Self { instance }
         }
