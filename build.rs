@@ -22,6 +22,13 @@ const CONAN_INSTALL_COMMANDS: &[&str] = &[
     "tools.cmake.cmaketoolchain:generator=Ninja",
 ];
 
+#[cfg(target_os = "macos")]
+const VULKAN_LIB_NAME: &str = "libvulkan.1.3.243.dylib";
+#[cfg(target_os = "macos")]
+const VULKAN_LIB_NAME_STEM: &str = "vulkan.1.3.243";
+#[cfg(target_os = "macos")]
+const VULKAN_LIB_INSTALL_NAME: &str = "libvulkan.1.dylib";
+
 fn is_command_available(command: &str) -> bool {
     Command::new(command)
         .arg("--version")
@@ -80,10 +87,35 @@ fn print_link_info() {
         "cargo:rustc-link-search=native={}",
         config.get("VULKAN_LIB").unwrap()
     );
-    #[cfg(windows)]
+    #[cfg(target_os = "windows")]
     println!("cargo:rustc-link-lib=vulkan-1");
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    println!("cargo:rustc-link-lib={VULKAN_LIB_NAME_STEM}");
+    #[cfg(target_os = "linux")]
     println!("cargo:rustc-link-lib=vulkan");
+
+    #[cfg(target_os = "macos")]
+    {
+        println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path");
+        println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");
+    }
+}
+
+fn copy_vulkan_dylib() {
+    #[cfg(target_os = "macos")]
+    {
+        let config = parse_config();
+        let src = Path::new(config.get("VULKAN_LIB").unwrap()).join(VULKAN_LIB_NAME);
+        let dst = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap())
+            .join("target")
+            .join(env::var("PROFILE").unwrap())
+            .join(VULKAN_LIB_INSTALL_NAME);
+        println!("src={}", src.display());
+        println!("dst={}", dst.display());
+        if !dst.exists() {
+            fs::copy(src, dst).unwrap();
+        }
+    }
 }
 
 fn generate_cargo_config() {
@@ -92,20 +124,14 @@ fn generate_cargo_config() {
         return;
     }
 
-    let config = parse_config();
-    let vvl_json = config.get("VVL_JSON").unwrap();
-    let vvl_bin = config.get("VVL_BIN").unwrap();
+    let deps_path = Path::new(&env::current_dir().unwrap()).join("deps");
 
     let cargo_config = format!(
-        r#"
-[env]
-VK_LAYER_PATH = {{ value = "{}", force = true }}
-DYLD_LIBRARY_PATH = {{ value = "{}", force = true }}
-LD_LIBRARY_PATH = {{ value = "{}", force = true }}
-        "#,
-        vvl_json.replace('\\', "/"),
-        vvl_bin.replace('\\', "/"),
-        vvl_bin.replace('\\', "/"),
+        r#"[env]
+VK_LAYER_PATH = {{ value = "{0}", force = true }}
+DYLD_LIBRARY_PATH = {{ value = "{0}", force = true }}
+"#,
+        deps_path.display(),
     );
 
     fs::create_dir_all(".cargo").unwrap();
@@ -115,6 +141,7 @@ LD_LIBRARY_PATH = {{ value = "{}", force = true }}
 fn main() {
     install_dependencies();
     print_link_info();
+    copy_vulkan_dylib();
     generate_cargo_config();
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=conanfile.py");

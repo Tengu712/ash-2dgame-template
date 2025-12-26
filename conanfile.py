@@ -1,5 +1,6 @@
 import os
 import platform
+import shutil
 import sys
 from conan import ConanFile
 from pathlib import Path
@@ -36,22 +37,23 @@ class Recipe(ConanFile):
 		if os.getenv("CARGO_PROFILE") == "debug":
 			vvl = self.dependencies.get("vulkan-validationlayers")
 			vvl_root = Path(vvl.package_folder)
-			vvl_json = self._find_path(vvl_root, "VkLayer_khronos_validation.json").parent
+			vvl_json = self._find_path(vvl_root, "VkLayer_khronos_validation.json")
 			system = platform.system()
 			if system == "Windows":
-				vvl_bin = self._find_path(vvl_root, "VkLayer_khronos_validation.dll").parent
+				vvl_bin = self._find_path(vvl_root, "VkLayer_khronos_validation.dll")
 			elif system == "Darwin":
-				vvl_bin = self._find_path(vvl_root, "libVkLayer_khronos_validation.dylib").parent
+				vvl_bin = self._find_path(vvl_root, "libVkLayer_khronos_validation.dylib")
 			else:
-				vvl_bin = self._find_path(vvl_root, "libVkLayer_khronos_validation.so").parent
+				vvl_bin = self._find_path(vvl_root, "libVkLayer_khronos_validation.so")
+
+		if vvl_json:
+			shutil.copy2(vvl_json, os.path.join(self.recipe_folder, "deps"))
+		if vvl_bin:
+			shutil.copy2(vvl_bin, os.path.join(self.recipe_folder, "deps"))
 
 		with open("conan-paths.txt", "w") as f:
 			f.write(f"VULKAN_LIB={vulkan_lib_dir}\n")
 			f.write(f"GLSLANG_BIN={glslang_bin_dir}\n")
-			if vvl_json:
-				f.write(f"VVL_JSON={vvl_json}\n")
-			if vvl_bin:
-				f.write(f"VVL_BIN={vvl_bin}\n")
 
 	def _find_path(self, dir_path, file_name):
 		founds = list(dir_path.rglob(file_name))
