@@ -131,7 +131,7 @@ fn generate_cargo_config() {
 VK_LAYER_PATH = {{ value = "{0}", force = true }}
 DYLD_LIBRARY_PATH = {{ value = "{0}", force = true }}
 "#,
-        deps_path.display(),
+        deps_path.display().to_string().replace('\\', "/"),
     );
 
     fs::create_dir_all(".cargo").unwrap();
