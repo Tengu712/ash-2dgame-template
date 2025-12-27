@@ -1,5 +1,5 @@
 use ash::{vk, *};
-use std::{ffi::CStr, slice};
+use std::{ffi::CStr, slice, sync::Mutex};
 
 /// Vulkanインスタンスにおける主要オブジェクト群
 ///
@@ -10,7 +10,7 @@ pub struct Context {
     pub physical_device: vk::PhysicalDevice,
     pub queue_family_index: u32,
     pub device: Device,
-    pub queue: vk::Queue,
+    pub queue: Mutex<vk::Queue>,
     pub command_pool: vk::CommandPool,
 }
 
@@ -21,6 +21,7 @@ impl Context {
         let queue_family_index = find_graphics_queue_family_index(&instance, physical_device);
         let device = create_device(&instance, physical_device, queue_family_index);
         let queue = unsafe { device.get_device_queue(queue_family_index, 0) };
+        let queue = Mutex::new(queue);
         let command_pool = create_command_pool(&device, queue_family_index);
         Self {
             instance,
