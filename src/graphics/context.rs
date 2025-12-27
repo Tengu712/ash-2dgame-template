@@ -1,4 +1,4 @@
-use ash::{*, vk};
+use ash::{vk, *};
 use std::{ffi::CStr, slice};
 
 /// Vulkanインスタンスにおける主要オブジェクト群
@@ -10,6 +10,8 @@ pub struct Context {
     pub physical_device: vk::PhysicalDevice,
     pub queue_family_index: u32,
     pub device: Device,
+    pub queue: vk::Queue,
+    pub command_pool: vk::CommandPool,
 }
 
 impl Context {
@@ -18,11 +20,15 @@ impl Context {
         let physical_device = select_physical_device(&instance);
         let queue_family_index = find_graphics_queue_family_index(&instance, physical_device);
         let device = create_device(&instance, physical_device, queue_family_index);
+        let queue = unsafe { device.get_device_queue(queue_family_index, 0) };
+        let command_pool = create_command_pool(&device, queue_family_index);
         Self {
             instance,
             physical_device,
             queue_family_index,
             device,
+            queue,
+            command_pool,
         }
     }
 }
@@ -31,6 +37,7 @@ impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
             self.device.device_wait_idle().expect("failed to wait idle");
+            self.device.destroy_command_pool(self.command_pool, None);
             self.device.destroy_device(None);
             self.instance.destroy_instance(None);
         }
@@ -128,5 +135,19 @@ fn create_device(
         instance
             .create_device(physical_device, &ci, None)
             .expect("failed to create a Vulkan device")
+    }
+}
+
+/// コマンドプールを作成する関数
+///
+/// このコマンドプールから割り当てられたコマンドバッファは個別にリセットできる。
+fn create_command_pool(device: &Device, queue_family_index: u32) -> vk::CommandPool {
+    let ci = vk::CommandPoolCreateInfo::default()
+        .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
+        .queue_family_index(queue_family_index);
+    unsafe {
+        device
+            .create_command_pool(&ci, None)
+            .expect("failed to create a command pool")
     }
 }
