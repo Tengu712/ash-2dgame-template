@@ -64,6 +64,19 @@ fn install_dependencies() {
         panic!("you must install conan or uv for installing dependencies.");
     }
     File::create(path).unwrap();
+
+    println!("cargo:rerun-if-changed=conanfile.py");
+}
+
+fn build_window_library() {
+    #[cfg(target_os = "windows")]
+    if !Path::new("deps/window.lib").exists() {
+        run("window\\windows\\build.bat", &[]);
+    }
+    #[cfg(target_os = "macos")]
+    todo!();
+    #[cfg(target_os = "linux")]
+    todo!();
 }
 
 fn parse_config() -> HashMap<String, String> {
@@ -93,6 +106,21 @@ fn print_link_info() {
     println!("cargo:rustc-link-lib={VULKAN_LIB_NAME_STEM}");
     #[cfg(target_os = "linux")]
     println!("cargo:rustc-link-lib=vulkan");
+
+    println!(
+        "cargo:rustc-link-search=native={}",
+        env::current_dir().unwrap().join("deps").display()
+    );
+    #[cfg(target_os = "windows")]
+    {
+        println!("cargo:rustc-link-lib=user32");
+        println!("cargo:rustc-link-lib=gdi32");
+        println!("cargo:rustc-link-lib=window");
+    }
+    #[cfg(target_os = "macos")]
+    todo!();
+    #[cfg(target_os = "linux")]
+    todo!();
 
     #[cfg(target_os = "macos")]
     {
@@ -140,9 +168,9 @@ DYLD_LIBRARY_PATH = {{ value = "{0}", force = true }}
 
 fn main() {
     install_dependencies();
+    build_window_library();
     print_link_info();
     copy_vulkan_dylib();
     generate_cargo_config();
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=conanfile.py");
 }
