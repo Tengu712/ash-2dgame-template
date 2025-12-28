@@ -58,11 +58,7 @@ fn create_instance(entry: &Entry, app_name: &CStr, app_version: u32) -> Instance
     let layers = [];
 
     #[cfg(target_os = "windows")]
-    let extensions = [
-        c"VK_KHR_surface".as_ptr(),
-        c"VK_KHR_win32_surface".as_ptr(),
-        c"VK_KHR_portability_enumeration".as_ptr(),
-    ];
+    let extensions = [c"VK_KHR_surface".as_ptr(), c"VK_KHR_win32_surface".as_ptr()];
     #[cfg(target_os = "macos")]
     let extensions = [
         c"VK_KHR_surface".as_ptr(),
@@ -137,10 +133,13 @@ fn create_device(
     physical_device: vk::PhysicalDevice,
     queue_family_index: u32,
 ) -> Device {
+    let extensions = [c"VK_KHR_swapchain".as_ptr()];
     let qci = vk::DeviceQueueCreateInfo::default()
         .queue_family_index(queue_family_index)
         .queue_priorities(&[1.0]);
-    let ci = vk::DeviceCreateInfo::default().queue_create_infos(slice::from_ref(&qci));
+    let ci = vk::DeviceCreateInfo::default()
+        .queue_create_infos(slice::from_ref(&qci))
+        .enabled_extension_names(&extensions);
     unsafe {
         instance
             .create_device(physical_device, &ci, None)

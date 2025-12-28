@@ -1,12 +1,20 @@
 use ash::{Entry, Instance, khr::win32_surface, vk};
 use std::{ffi::c_void, iter};
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+struct WindowSize {
+    width: u32,
+    height: u32,
+}
+
 #[link(name = "window", kind = "static")]
 unsafe extern "C" {
     fn get_instance() -> *mut c_void;
     fn create_window(title: *const u16, width: u32, height: u32) -> *mut c_void;
     fn destroy_window(window: *mut c_void);
     fn process_window_events() -> u8;
+    fn get_current_client_size(window: *mut c_void) -> WindowSize;
 }
 
 pub struct Window {
@@ -46,6 +54,16 @@ impl Window {
             instance
                 .create_win32_surface(&ci, None)
                 .expect("failed to create a surface")
+        }
+    }
+
+    pub fn get_current_client_size(&self) -> vk::Extent2D {
+        unsafe {
+            let size = get_current_client_size(self.window);
+            vk::Extent2D {
+                width: size.width,
+                height: size.height,
+            }
         }
     }
 }

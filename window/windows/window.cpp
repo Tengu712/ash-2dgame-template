@@ -139,3 +139,18 @@ extern "C" uint8_t process_window_events() {
 		DispatchMessageW(&msg);
 	}
 }
+
+struct WindowSize {
+	uint32_t width;
+	uint32_t height;
+};
+
+/// 現在のウィンドウクライアントサイズを取得する関数
+extern "C" WindowSize get_current_client_size(void *window) {
+	RECT rect;
+	GetClientRect(static_cast<HWND>(window), &rect);
+	return {
+		static_cast<uint32_t>(rect.right  - rect.left),
+		static_cast<uint32_t>(rect.bottom - rect.top),
+	};
+}
