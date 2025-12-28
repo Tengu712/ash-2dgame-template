@@ -1,14 +1,22 @@
+use ash::Entry;
+use std::sync::Arc;
+
 mod graphics;
 mod settings;
 
-use graphics::GraphicsEngine;
+use graphics::{context::Context, submit::Submitter, window::Window};
+use settings::*;
 
 fn main() {
-    let gengine = GraphicsEngine::new();
+    let window = Window::new(WINDOW_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-    loop {
-        if !gengine.run() {
-            break;
-        }
+    let entry = Entry::linked();
+    let ctx = Context::new(&entry, APPLICATION_NAME, APPLICATION_VERSION);
+    let ctx = Arc::new(ctx);
+    let _ = Submitter::new(Arc::clone(&ctx));
+
+    while window.process_events() {
+        // DEBUG:
+        std::thread::sleep(std::time::Duration::from_millis(16));
     }
 }

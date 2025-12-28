@@ -1,6 +1,5 @@
-use super::super::Context;
-use ash::{prelude::VkResult, vk};
-use std::marker::PhantomData;
+use super::Submitter;
+use ash::prelude::VkResult;
 
 /// 提出済みのコマンドバッファ
 ///
@@ -8,37 +7,20 @@ use std::marker::PhantomData;
 ///
 /// NOTE: 明示的に`wait()`によって実行完了を待機しない場合、
 ///       drop時にコマンドの実行完了が待機される。
-pub struct SubmittedCommandBuffer<'a> {
-    ctx: &'a Context,
-    command_buffer: vk::CommandBuffer,
-    fence: vk::Fence,
-    waited: bool,
-
-    // NOTE: Submitterと同様。
-    _not_send_sync: PhantomData<*const ()>,
-}
+pub struct SubmittedCommandBuffer<'a>(&'a mut Submitter, bool);
 
 impl<'a> SubmittedCommandBuffer<'a> {
-    pub(super) fn new(
-        ctx: &'a Context,
-        command_buffer: vk::CommandBuffer,
-        fence: vk::Fence,
-    ) -> Self {
-        Self {
-            ctx,
-            command_buffer,
-            fence,
-            waited: false,
-            _not_send_sync: PhantomData,
-        }
+    pub(super) fn new(submitter: &'a mut Submitter) -> Self {
+        Self(submitter, false)
     }
 
     pub fn wait(mut self) -> VkResult<()> {
         unsafe {
-            self.waited = true;
-            self.ctx
+            self.1 = true;
+            self.0
+                .ctx
                 .device
-                .wait_for_fences(&[self.fence], true, u64::MAX)
+                .wait_for_fences(&[self.0.fence], true, u64::MAX)
         }
     }
 }
@@ -46,11 +28,12 @@ impl<'a> SubmittedCommandBuffer<'a> {
 impl Drop for SubmittedCommandBuffer<'_> {
     fn drop(&mut self) {
         unsafe {
-            if !self.waited {
+            if !self.1 {
                 let _ = self
+                    .0
                     .ctx
                     .device
-                    .wait_for_fences(&[self.fence], true, u64::MAX);
+                    .wait_for_fences(&[self.0.fence], true, u64::MAX);
             }
         }
     }

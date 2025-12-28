@@ -36,7 +36,7 @@ impl Submitter {
         }
     }
 
-    pub fn prepare<'a>(&'a self) -> VkResult<RecordingCommandBuffer<'a>> {
+    pub fn prepare<'a>(&'a mut self) -> VkResult<RecordingCommandBuffer<'a>> {
         unsafe {
             self.ctx
                 .device

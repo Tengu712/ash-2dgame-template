@@ -1,25 +1,14 @@
-use super::{super::Context, Submitter, submitted::SubmittedCommandBuffer};
+use super::{Submitter, submitted::SubmittedCommandBuffer};
 use ash::{prelude::VkResult, vk};
-use std::{marker::PhantomData, slice};
+use std::slice;
 
 /// 記録中のコマンドバッファ
 ///
 /// 単一のスレッド上で動作する。
-///
-/// WARN: この`command_buffer`はコマンドの記録に対してのみ用いること。
-///       決して、リセット・開始・終了等したりせず、
-///       また`RecordingCommandBuffer`をdropしてなお使い続けることはしないこと。
-pub struct RecordingCommandBuffer<'a> {
-    pub command_buffer: vk::CommandBuffer,
-    ctx: &'a Context,
-    fence: vk::Fence,
-
-    // NOTE: Submitterと同様。
-    _not_send_sync: PhantomData<*const ()>,
-}
+pub struct RecordingCommandBuffer<'a>(&'a mut Submitter);
 
 impl<'a> RecordingCommandBuffer<'a> {
-    pub(super) fn new(submitter: &'a Submitter) -> VkResult<Self> {
+    pub(super) fn new(submitter: &'a mut Submitter) -> VkResult<Self> {
         unsafe {
             let bi = vk::CommandBufferBeginInfo::default()
                 .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
@@ -27,13 +16,17 @@ impl<'a> RecordingCommandBuffer<'a> {
                 .ctx
                 .device
                 .begin_command_buffer(submitter.command_buffer, &bi)?;
-            Ok(Self {
-                command_buffer: submitter.command_buffer,
-                ctx: &submitter.ctx,
-                fence: submitter.fence,
-                _not_send_sync: PhantomData,
-            })
+            Ok(Self(submitter))
         }
+    }
+
+    /// コマンドバッファを取得する関数
+    ///
+    /// WARN: この`command_buffer`はコマンドの記録に対してのみ用いること。
+    ///       決して、リセット・開始・終了等したりせず、
+    ///       また`RecordingCommandBuffer`をdropしてなお使い続けることはしないこと。
+    pub fn command_buffer(&self) -> vk::CommandBuffer {
+        self.0.command_buffer
     }
 
     /// コマンドを提出する関数
@@ -46,11 +39,15 @@ impl<'a> RecordingCommandBuffer<'a> {
         signal_semaphores: &[vk::Semaphore],
     ) -> VkResult<SubmittedCommandBuffer<'a>> {
         unsafe {
-            self.ctx.device.end_command_buffer(self.command_buffer)?;
+            self.0
+                .ctx
+                .device
+                .end_command_buffer(self.0.command_buffer)?;
 
-            self.ctx.device.reset_fences(&[self.fence])?;
+            self.0.ctx.device.reset_fences(&[self.0.fence])?;
 
             let queue = self
+                .0
                 .ctx
                 .queue
                 .lock()
@@ -58,17 +55,17 @@ impl<'a> RecordingCommandBuffer<'a> {
             let (wait_semaphores, wait_dst_stage_masks): (Vec<_>, Vec<_>) =
                 wait_infos.iter().copied().unzip();
             let si = vk::SubmitInfo::default()
-                .command_buffers(slice::from_ref(&self.command_buffer))
+                .command_buffers(slice::from_ref(&self.0.command_buffer))
                 .wait_dst_stage_mask(&wait_dst_stage_masks)
                 .wait_semaphores(&wait_semaphores)
                 .signal_semaphores(signal_semaphores);
-            self.ctx.device.queue_submit(*queue, &[si], self.fence)?;
+            self.0
+                .ctx
+                .device
+                .queue_submit(*queue, &[si], self.0.fence)?;
+            drop(queue);
 
-            Ok(SubmittedCommandBuffer::new(
-                self.ctx,
-                self.command_buffer,
-                self.fence,
-            ))
+            Ok(SubmittedCommandBuffer::new(self.0))
         }
     }
 }
