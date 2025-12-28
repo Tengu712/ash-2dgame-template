@@ -13,6 +13,7 @@ use recording::RecordingCommandBuffer;
 /// 複数スレッドからコマンドを提出する場合は各スレッドでSubmitterを作成すること。
 pub struct Submitter {
     ctx: Arc<Context>,
+    command_pool: vk::CommandPool,
     command_buffer: vk::CommandBuffer,
     fence: vk::Fence,
 
@@ -23,10 +24,12 @@ pub struct Submitter {
 
 impl Submitter {
     pub fn new(ctx: Arc<Context>) -> Self {
-        let command_buffer = allocate_command_buffer(&ctx.device, ctx.command_pool);
+        let command_pool = create_command_pool(&ctx.device, ctx.queue_family_index);
+        let command_buffer = allocate_command_buffer(&ctx.device, command_pool);
         let fence = create_fence(&ctx.device);
         Self {
             ctx,
+            command_pool,
             command_buffer,
             fence,
             _not_send_sync: PhantomData,
@@ -52,9 +55,26 @@ impl Drop for Submitter {
                 .reset_command_buffer(self.command_buffer, vk::CommandBufferResetFlags::empty());
             self.ctx
                 .device
-                .free_command_buffers(self.ctx.command_pool, &[self.command_buffer]);
+                .free_command_buffers(self.command_pool, &[self.command_buffer]);
+            self.ctx
+                .device
+                .destroy_command_pool(self.command_pool, None);
             self.ctx.device.destroy_fence(self.fence, None);
         }
+    }
+}
+
+/// コマンドプールを作成する関数
+///
+/// このコマンドプールから割り当てられたコマンドバッファは個別にリセットできる。
+fn create_command_pool(device: &Device, queue_family_index: u32) -> vk::CommandPool {
+    let ci = vk::CommandPoolCreateInfo::default()
+        .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
+        .queue_family_index(queue_family_index);
+    unsafe {
+        device
+            .create_command_pool(&ci, None)
+            .expect("failed to create a command pool")
     }
 }
 
