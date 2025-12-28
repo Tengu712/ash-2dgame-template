@@ -40,7 +40,7 @@ impl Submitter {
         unsafe {
             self.ctx
                 .device
-                .reset_command_buffer(self.command_buffer, vk::CommandBufferResetFlags::empty())?;
+                .reset_command_pool(self.command_pool, vk::CommandPoolResetFlags::empty())?;
             RecordingCommandBuffer::new(self)
         }
     }
@@ -52,7 +52,7 @@ impl Drop for Submitter {
             let _ = self
                 .ctx
                 .device
-                .reset_command_buffer(self.command_buffer, vk::CommandBufferResetFlags::empty());
+                .reset_command_pool(self.command_pool, vk::CommandPoolResetFlags::empty());
             self.ctx
                 .device
                 .free_command_buffers(self.command_pool, &[self.command_buffer]);
@@ -64,13 +64,8 @@ impl Drop for Submitter {
     }
 }
 
-/// コマンドプールを作成する関数
-///
-/// このコマンドプールから割り当てられたコマンドバッファは個別にリセットできる。
 fn create_command_pool(device: &Device, queue_family_index: u32) -> vk::CommandPool {
-    let ci = vk::CommandPoolCreateInfo::default()
-        .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
-        .queue_family_index(queue_family_index);
+    let ci = vk::CommandPoolCreateInfo::default().queue_family_index(queue_family_index);
     unsafe {
         device
             .create_command_pool(&ci, None)
