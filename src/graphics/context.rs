@@ -1,11 +1,16 @@
 use ash::{vk, *};
-use std::{ffi::CStr, slice, sync::Mutex};
+use std::{
+    ffi::CStr,
+    slice,
+    sync::{Arc, Mutex},
+};
 
 /// Vulkanインスタンスにおける主要オブジェクト群
 ///
 /// NOTE: Vulkanインスタンスは1アプリケーション上で複数個作成できる。
 ///       そのため、VulkanLoaderへの参照の表現であるash::Entryは含まない。
 pub struct Context {
+    pub entry: Arc<Entry>,
     pub instance: Instance,
     pub physical_device: vk::PhysicalDevice,
     pub queue_family_index: u32,
@@ -14,14 +19,15 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(entry: &Entry, app_name: &CStr, app_version: u32) -> Self {
-        let instance = create_instance(entry, app_name, app_version);
+    pub fn new(entry: Arc<Entry>, app_name: &CStr, app_version: u32) -> Self {
+        let instance = create_instance(&entry, app_name, app_version);
         let physical_device = select_physical_device(&instance);
         let queue_family_index = find_graphics_queue_family_index(&instance, physical_device);
         let device = create_device(&instance, physical_device, queue_family_index);
         let queue = unsafe { device.get_device_queue(queue_family_index, 0) };
         let queue = Mutex::new(queue);
         Self {
+            entry,
             instance,
             physical_device,
             queue_family_index,
@@ -45,16 +51,24 @@ impl Drop for Context {
 ///
 /// - debugビルド時はバリデーションレイヤーを有効化する。
 /// - macOSではMoltenVKのための拡張等を有効化する。
+/// - 各OS専用のサーフェス拡張を有効化する。
 fn create_instance(entry: &Entry, app_name: &CStr, app_version: u32) -> Instance {
     #[cfg(debug_assertions)]
     let layers = [c"VK_LAYER_KHRONOS_validation".as_ptr()];
     #[cfg(not(debug_assertions))]
     let layers = [];
 
+    #[cfg(target_os = "windows")]
+    let extensions = [
+        c"VK_KHR_surface".as_ptr(),
+        c"VK_KHR_win32_surface".as_ptr(),
+        c"VK_KHR_portability_enumeration".as_ptr(),
+    ];
     #[cfg(target_os = "macos")]
-    let extensions = [c"VK_KHR_portability_enumeration".as_ptr()];
-    #[cfg(not(target_os = "macos"))]
-    let extensions = [];
+    let extensions = [
+        c"VK_KHR_surface".as_ptr(),
+        c"VK_KHR_portability_enumeration".as_ptr(),
+    ];
 
     #[cfg(target_os = "macos")]
     let flags = vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR;

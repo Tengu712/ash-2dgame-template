@@ -4,15 +4,17 @@ use std::sync::Arc;
 mod graphics;
 mod settings;
 
-use graphics::{context::Context, submit::Submitter, window::Window};
+use graphics::{context::Context, submit::Submitter, swapchain::Swapchain, window::Window};
 use settings::*;
 
 fn main() {
     let window = Window::new(WINDOW_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     let entry = Entry::linked();
-    let ctx = Context::new(&entry, APPLICATION_NAME, APPLICATION_VERSION);
+    let entry = Arc::new(entry);
+    let ctx = Context::new(Arc::clone(&entry), APPLICATION_NAME, APPLICATION_VERSION);
     let ctx = Arc::new(ctx);
+    let _ = Swapchain::new(Arc::clone(&ctx), &window);
     let _ = Submitter::new(Arc::clone(&ctx));
 
     while window.process_events() {

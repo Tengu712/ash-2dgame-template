@@ -68,6 +68,11 @@ void calculateWindowPlacement(int w, int h, int &x, int &y) {
 
 } // namespace
 
+/// インスタンスハンドルを取得する関数
+extern "C" void *get_instance() {
+	return GetModuleHandleW(nullptr);
+}
+
 /// ウィンドウを作成する関数
 ///
 /// 成功時はウィンドウハンドルを返し、
