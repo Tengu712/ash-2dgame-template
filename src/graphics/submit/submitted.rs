@@ -3,8 +3,6 @@ use ash::prelude::VkResult;
 
 /// 提出済みのコマンドバッファ
 ///
-/// 単一のスレッド上で動作する。
-///
 /// NOTE: 明示的に`wait()`によって実行完了を待機しない場合、
 ///       drop時にコマンドの実行完了が待機される。
 pub struct SubmittedCommandBuffer<'a>(&'a mut Submitter, bool);

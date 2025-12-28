@@ -3,8 +3,6 @@ use ash::{prelude::VkResult, vk};
 use std::slice;
 
 /// 記録中のコマンドバッファ
-///
-/// 単一のスレッド上で動作する。
 pub struct RecordingCommandBuffer<'a>(&'a mut Submitter);
 
 impl<'a> RecordingCommandBuffer<'a> {

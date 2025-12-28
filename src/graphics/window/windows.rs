@@ -9,9 +9,6 @@ unsafe extern "C" {
     fn process_window_events() -> u8;
 }
 
-/// Win32API製ウィンドウ
-///
-/// 単一スレッドで動作する。
 pub struct Window {
     instance: *mut c_void,
     window: *mut c_void,

@@ -7,8 +7,7 @@ use std::{
 
 /// Vulkanインスタンスにおける主要オブジェクト群
 ///
-/// NOTE: Vulkanインスタンスは1アプリケーション上で複数個作成できる。
-///       そのため、VulkanLoaderへの参照の表現であるash::Entryは含まない。
+/// スレッドセーフ。
 pub struct Context {
     pub entry: Arc<Entry>,
     pub instance: Instance,
