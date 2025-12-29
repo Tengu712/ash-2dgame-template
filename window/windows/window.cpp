@@ -1,11 +1,17 @@
+//! Windowsにおけるウィンドウライブラリ
+//!
+//! NOTE: Rustにはお手軽なウィンドウライブラリがないため、仕方なくC++で書いている。
+//!
+//! WARN: マルチスレッド対応をしていないため、必ず単一スレッドで動作すること。
+
 #include <cstdint>
-#include <stdexcept>
-#include <string>
 #include <Windows.h>
 
 namespace {
 
 constexpr LPCWSTR WINDOW_CLASS_NAME = L"SkdWindow\0";
+
+HWND g_window = nullptr;
 
 LRESULT CALLBACK windowProc(HWND window, UINT msg, WPARAM wParam, LPARAM lParam) {
 	switch (msg) {
@@ -17,12 +23,12 @@ LRESULT CALLBACK windowProc(HWND window, UINT msg, WPARAM wParam, LPARAM lParam)
 	}
 }
 
-void RegisterWindowClass(HINSTANCE inst) {
+bool RegisterWindowClass(HINSTANCE inst) {
 	WNDCLASSEXW windowClass;
 	windowClass.cbSize = sizeof(WNDCLASSEXW);
 
 	if (GetClassInfoExW(inst, WINDOW_CLASS_NAME, &windowClass)) {
-		return;
+		return true;
 	}
 
 	windowClass.style         = CS_CLASSDC;
@@ -37,8 +43,9 @@ void RegisterWindowClass(HINSTANCE inst) {
 	windowClass.lpszClassName = WINDOW_CLASS_NAME;
 	windowClass.hIconSm       = nullptr;
 	if (RegisterClassExW(&windowClass) == 0) {
-		throw std::runtime_error("failed to register a window class.");
+		return false;
 	}
+	return true;
 }
 
 void adjustWindowSize(DWORD style, int sceneWidth, int sceneHeight, int &windowWidth, int &windowHeight) {
@@ -69,64 +76,77 @@ void calculateWindowPlacement(int w, int h, int &x, int &y) {
 } // namespace
 
 /// インスタンスハンドルを取得する関数
-extern "C" void *get_instance() {
+extern "C" void *get_instance_handle() {
 	return GetModuleHandleW(nullptr);
+}
+
+/// ウィンドウハンドルを取得する関数
+///
+/// ウィンドウが存在しない場合、nullptrを返す。
+extern "C" void *get_window_handle() {
+	return g_window;
 }
 
 /// ウィンドウを作成する関数
 ///
-/// 成功時はウィンドウハンドルを返し、
-/// 失敗時はエラーダイアログを表示してnullptrを返す。
-extern "C" void *create_window(const wchar_t *title, uint32_t width, uint32_t height) {
-	try {
-		constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
-		const auto inst = GetModuleHandleW(nullptr);
-		RegisterWindowClass(inst);
-		int w, h;
-		adjustWindowSize(style, static_cast<int>(width), static_cast<int>(height), w, h);
-		int x, y;
-		calculateWindowPlacement(w, h, x, y);
-
-		const auto window = CreateWindowExW(
-			0,
-			WINDOW_CLASS_NAME,
-			title,
-			style,
-			x,
-			y,
-			w,
-			h,
-			NULL,
-			NULL,
-			inst,
-			NULL
-		);
-		if (window == nullptr) {
-			throw std::runtime_error("failed to create a window.");
-		}
-
-		ShowWindow(window, SW_SHOWDEFAULT);
-		UpdateWindow(window);
-		return window;
-	} catch (const std::exception &e) {
-		const std::string msg(e.what());
-		const std::wstring wmsg(msg.cbegin(), msg.cend());
-		MessageBoxW(nullptr, wmsg.c_str(), L"Error", MB_OK | MB_ICONERROR);
-		return nullptr;
+/// 失敗時や既に作成済みの場合は0を返す。
+extern "C" uint8_t create_window(const wchar_t *title, uint32_t width, uint32_t height) {
+	constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+	const auto inst = GetModuleHandleW(nullptr);
+	if (!RegisterWindowClass(inst)) {
+		return 0;
 	}
+	int w, h;
+	adjustWindowSize(style, static_cast<int>(width), static_cast<int>(height), w, h);
+	int x, y;
+	calculateWindowPlacement(w, h, x, y);
+
+	const auto window = CreateWindowExW(
+		0,
+		WINDOW_CLASS_NAME,
+		title,
+		style,
+		x,
+		y,
+		w,
+		h,
+		NULL,
+		NULL,
+		inst,
+		NULL
+	);
+	if (window == nullptr) {
+		return 0;
+	}
+
+	ShowWindow(window, SW_SHOWDEFAULT);
+	UpdateWindow(window);
+
+	g_window = window;
+	return 1;
 }
 
 /// ウィンドウを閉じる関数
-extern "C" void destroy_window(void *window) {
-	if (window != nullptr) {
-		DestroyWindow(static_cast<HWND>(window));
+extern "C" void destroy_window() {
+	if (g_window != nullptr) {
+		DestroyWindow(g_window);
+		g_window = nullptr;
 	}
 }
 
+struct WindowSize {
+	uint32_t width;
+	uint32_t height;
+};
+
 /// 溜まったウィンドウイベントを処理する関数
 ///
-/// ウィンドウが閉じられたならば0、そうでないなら0以外を返す。
+/// ウィンドウが存在しない場合や・ウィンドウが閉じられた場合は0を返す。
 extern "C" uint8_t process_window_events() {
+	if (g_window == nullptr) {
+		return 0;
+	}
+
 	MSG msg;
 	while (true) {
 		if (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE) == 0) {
@@ -140,15 +160,19 @@ extern "C" uint8_t process_window_events() {
 	}
 }
 
-struct WindowSize {
-	uint32_t width;
-	uint32_t height;
-};
-
 /// 現在のウィンドウクライアントサイズを取得する関数
-extern "C" WindowSize get_current_client_size(void *window) {
+///
+/// ウィンドウが存在しない場合、0x0のサイズを返す。
+extern "C" WindowSize get_current_client_size() {
+	if (g_window == nullptr) {
+		return {0, 0};
+	}
+
 	RECT rect;
-	GetClientRect(static_cast<HWND>(window), &rect);
+	if (!GetClientRect(g_window, &rect)) {
+		return {0, 0};
+	}
+
 	return {
 		static_cast<uint32_t>(rect.right  - rect.left),
 		static_cast<uint32_t>(rect.bottom - rect.top),

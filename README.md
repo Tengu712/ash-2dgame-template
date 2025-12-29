@@ -4,6 +4,10 @@
 
 Rustのashを使った2Dゲーム向けのテンプレートコードです。
 
+> [!WARNING]
+> マルチスレッドに対応していません。
+> マルチスレッドで動作させる場合は多くの箇所に修正が必要です。
+
 ## Build
 
 次を用意してください:
@@ -36,5 +40,5 @@ classDiagram
     Entry "1" -- "0..*" Context
     Context "1" -- "0..*" Submitter
     Context "1" -- "0..*" Swapchain
-    Window "1" -- "1" Swapchain : same thread
+    Window "1" -- "1" Swapchain
 ```

@@ -2,34 +2,39 @@ use ash::{
     khr::{self, surface, swapchain},
     vk, *,
 };
-use std::{
-    ffi::CStr,
-    slice,
-    sync::{Arc, Mutex},
-};
+use std::{ffi::CStr, slice, sync::LazyLock};
+
+/// Vulkanローダへのハンドルのようなもの
+///
+/// NOTE: 次が期待されるためここに`LazyLock`で定義されている:
+///       - 1アプリケーション1個である
+///       - contextモジュールのみ扱うものである
+static ENTRY: LazyLock<Entry> = LazyLock::new(Entry::linked);
 
 /// Vulkanインスタンスにおける主要オブジェクト群
 ///
-/// スレッドセーフ。
+/// 一個のVulkanインスタンスを表す。
+/// 複数個作ることはできるが、マルチスレッド対応していないこともあって、メリットはない。
+///
+/// WARN: マルチスレッド対応していないため、単一スレッドでのみ扱うこと。
+//
+// HINT: マルチスレッド対応する場合は、`queueを`Mutex<vk::Queue>`にすると良い。
 pub struct Context {
     pub instance: Instance,
     pub physical_device: vk::PhysicalDevice,
     pub queue_family_index: u32,
     pub device: Device,
-    pub queue: Mutex<vk::Queue>,
-    entry: Arc<Entry>,
+    pub queue: vk::Queue,
 }
 
 impl Context {
-    pub fn new(entry: Arc<Entry>, app_name: &CStr, app_version: u32) -> Self {
-        let instance = create_instance(&entry, app_name, app_version);
+    pub fn new(app_name: &CStr, app_version: u32) -> Self {
+        let instance = create_instance(&ENTRY, app_name, app_version);
         let physical_device = select_physical_device(&instance);
         let queue_family_index = find_graphics_queue_family_index(&instance, physical_device);
         let device = create_device(&instance, physical_device, queue_family_index);
         let queue = unsafe { device.get_device_queue(queue_family_index, 0) };
-        let queue = Mutex::new(queue);
         Self {
-            entry,
             instance,
             physical_device,
             queue_family_index,
@@ -39,7 +44,7 @@ impl Context {
     }
 
     pub fn surface_loader(&self) -> surface::Instance {
-        surface::Instance::new(&self.entry, &self.instance)
+        surface::Instance::new(&ENTRY, &self.instance)
     }
 
     pub fn swapchain_loader(&self) -> swapchain::Device {
@@ -48,14 +53,32 @@ impl Context {
 
     #[cfg(target_os = "windows")]
     pub fn win32_surface_loader(&self) -> khr::win32_surface::Instance {
-        khr::win32_surface::Instance::new(&self.entry, &self.instance)
+        khr::win32_surface::Instance::new(&ENTRY, &self.instance)
+    }
+}
+
+impl Context {
+    pub fn find_memory_type_index(
+        &self,
+        type_bits: u32,
+        mask: vk::MemoryPropertyFlags,
+    ) -> Option<u32> {
+        let props = unsafe {
+            self.instance
+                .get_physical_device_memory_properties(self.physical_device)
+        };
+        props.memory_types[..props.memory_type_count as _]
+            .iter()
+            .enumerate()
+            .find(|(i, mtype)| (1 << i) & type_bits != 0 && mtype.property_flags & mask == mask)
+            .map(|(i, _)| i as _)
     }
 }
 
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
-            self.device.device_wait_idle().expect("failed to wait idle");
+            let _ = self.device.device_wait_idle();
             self.device.destroy_device(None);
             self.instance.destroy_instance(None);
         }

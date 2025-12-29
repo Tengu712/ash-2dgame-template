@@ -3,6 +3,9 @@ use ash::{prelude::VkResult, vk};
 use std::slice;
 
 /// 記録中のコマンドバッファ
+//
+// NOTE: `Submitter`を可変参照で持つことで、
+//       `RecordingCommandBuffer`がdropされるまで`Submitter`を操作できなくする。
 pub struct RecordingCommandBuffer<'a>(&'a mut Submitter);
 
 impl<'a> RecordingCommandBuffer<'a> {
@@ -44,12 +47,6 @@ impl<'a> RecordingCommandBuffer<'a> {
 
             self.0.ctx.device.reset_fences(&[self.0.fence])?;
 
-            let queue = self
-                .0
-                .ctx
-                .queue
-                .lock()
-                .map_err(|_| vk::Result::ERROR_UNKNOWN)?;
             let (wait_semaphores, wait_dst_stage_masks): (Vec<_>, Vec<_>) =
                 wait_infos.iter().copied().unzip();
             let si = vk::SubmitInfo::default()
@@ -60,8 +57,7 @@ impl<'a> RecordingCommandBuffer<'a> {
             self.0
                 .ctx
                 .device
-                .queue_submit(*queue, &[si], self.0.fence)?;
-            drop(queue);
+                .queue_submit(self.0.ctx.queue, &[si], self.0.fence)?;
 
             Ok(SubmittedCommandBuffer::new(self.0))
         }

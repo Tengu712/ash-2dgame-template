@@ -1,6 +1,7 @@
-use super::{context::Context, window::Window};
+use super::context::Context;
+use crate::window::Window;
 use ash::{khr::swapchain, prelude::VkResult, vk};
-use std::sync::Arc;
+use std::rc::Rc;
 
 mod info;
 
@@ -8,20 +9,24 @@ use info::SurfaceInfoForSwapchain;
 
 /// スワップチェーン
 ///
-/// Windowと同じスレッドでのみ動作する。
+/// WARN: コード的には許容されているが、1ウィンドウ1スワップチェーンを保つこと。
 pub struct Swapchain<'a> {
     pub surface: vk::SurfaceKHR,
     pub resolution: vk::Extent2D,
     pub format: vk::SurfaceFormatKHR,
     pub swapchain: vk::SwapchainKHR,
-    ctx: Arc<Context>,
+    ctx: Rc<Context>,
     window: &'a Window,
 }
 
 impl<'a> Swapchain<'a> {
-    pub fn new(ctx: Arc<Context>, window: &'a Window) -> Self {
-        let surface = window.create_surface(&ctx);
-        let window_size = window.get_current_client_size();
+    pub fn new(ctx: Rc<Context>, window: &'a Window) -> Self {
+        #[cfg(target_os = "windows")]
+        let surface = window.create_surface(&ctx.win32_surface_loader())
+            .expect("failed to create the surface of the window");
+
+        let window_size = window.get_current_client_size()
+            .expect("failed to get the client size of the window");
         let info = SurfaceInfoForSwapchain::from(
             &ctx.surface_loader(),
             ctx.physical_device,

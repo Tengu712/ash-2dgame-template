@@ -5,6 +5,9 @@ use ash::prelude::VkResult;
 ///
 /// NOTE: 明示的に`wait()`によって実行完了を待機しない場合、
 ///       drop時にコマンドの実行完了が待機される。
+//
+// NOTE: `Submitter`を可変参照で持つことで、
+//       `SubmittedCommandBuffer`がdropされるまで`Submitter`を操作できなくする。
 pub struct SubmittedCommandBuffer<'a>(&'a mut Submitter, bool);
 
 impl<'a> SubmittedCommandBuffer<'a> {

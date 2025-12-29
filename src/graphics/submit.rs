@@ -1,6 +1,6 @@
 use super::context::Context;
 use ash::{Device, prelude::VkResult, vk};
-use std::{marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData, rc::Rc};
 
 pub mod recording;
 pub mod submitted;
@@ -10,20 +10,16 @@ use recording::RecordingCommandBuffer;
 /// Vulkanコマンドを記録・提出するためのオブジェクト
 ///
 /// 単一のスレッド上で動作する。
-/// 複数スレッドからコマンドを提出する場合は各スレッドでSubmitterを作成すること。
 pub struct Submitter {
-    ctx: Arc<Context>,
+    ctx: Rc<Context>,
     command_pool: vk::CommandPool,
     command_buffer: vk::CommandBuffer,
     fence: vk::Fence,
-
-    // NOTE: 複数スレッドでの共有を防ぐため。
-    // NOTE: 生ポインタはSendでもSyncでもない。
     _not_send_sync: PhantomData<*const ()>,
 }
 
 impl Submitter {
-    pub fn new(ctx: Arc<Context>) -> Self {
+    pub fn new(ctx: Rc<Context>) -> Self {
         let command_pool = create_command_pool(&ctx.device, ctx.queue_family_index);
         let command_buffer = allocate_command_buffer(&ctx.device, command_pool);
         let fence = create_fence(&ctx.device);
