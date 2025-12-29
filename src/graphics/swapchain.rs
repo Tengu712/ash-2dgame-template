@@ -10,18 +10,18 @@ use info::SurfaceInfoForSwapchain;
 /// スワップチェーン
 ///
 /// WARN: コード的には許容されているが、1ウィンドウ1スワップチェーンを保つこと。
-pub struct Swapchain<'a> {
+pub struct Swapchain {
     pub surface: vk::SurfaceKHR,
     pub resolution: vk::Extent2D,
     pub format: vk::SurfaceFormatKHR,
     pub swapchain: vk::SwapchainKHR,
     pub image_views: Vec<ImageView>,
     ctx: Rc<Context>,
-    window: &'a Window,
+    window: Rc<Window>,
 }
 
-impl<'a> Swapchain<'a> {
-    pub fn new(ctx: Rc<Context>, window: &'a Window) -> Self {
+impl Swapchain {
+    pub fn new(ctx: Rc<Context>, window: Rc<Window>) -> Self {
         let swapchain_loader = ctx.swapchain_loader();
 
         // surface
@@ -61,7 +61,7 @@ impl<'a> Swapchain<'a> {
     }
 }
 
-impl Drop for Swapchain<'_> {
+impl Drop for Swapchain {
     fn drop(&mut self) {
         unsafe {
             self.image_views.clear();

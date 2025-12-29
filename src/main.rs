@@ -16,10 +16,11 @@ fn main() {
     const APPLICATION_VERSION: u32 = vk::make_api_version(0, 0, 1, 0);
 
     let window = Window::new(WINDOW_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT);
+    let window = Rc::new(window);
 
     let ctx = Context::new(APPLICATION_NAME, APPLICATION_VERSION);
     let ctx = Rc::new(ctx);
-    let _ = Swapchain::new(Rc::clone(&ctx), &window);
+    let _ = Swapchain::new(Rc::clone(&ctx), Rc::clone(&window));
     let _ = Submitter::new(Rc::clone(&ctx));
 
     while window.process_events() {
