@@ -1,4 +1,5 @@
-use ash::{Entry, Instance, khr::win32_surface, vk};
+use crate::graphics::context::Context;
+use ash::vk;
 use std::{ffi::c_void, iter};
 
 #[repr(C)]
@@ -45,13 +46,12 @@ impl Window {
         unsafe { process_window_events() != 0 }
     }
 
-    pub fn create_surface(&self, entry: &Entry, instance: &Instance) -> vk::SurfaceKHR {
-        let instance = win32_surface::Instance::new(entry, instance);
+    pub fn create_surface(&self, ctx: &Context) -> vk::SurfaceKHR {
         let ci = vk::Win32SurfaceCreateInfoKHR::default()
             .hinstance(self.instance as isize)
             .hwnd(self.window as isize);
         unsafe {
-            instance
+            ctx.win32_surface_loader()
                 .create_win32_surface(&ci, None)
                 .expect("failed to create a surface")
         }

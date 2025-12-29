@@ -1,9 +1,5 @@
 use super::{context::Context, window::Window};
-use ash::{
-    khr::{surface, swapchain},
-    prelude::VkResult,
-    vk,
-};
+use ash::{khr::swapchain, prelude::VkResult, vk};
 use std::sync::Arc;
 
 mod info;
@@ -24,16 +20,17 @@ pub struct Swapchain<'a> {
 
 impl<'a> Swapchain<'a> {
     pub fn new(ctx: Arc<Context>, window: &'a Window) -> Self {
-        let instance = surface::Instance::new(&ctx.entry, &ctx.instance);
-        let device = swapchain::Device::new(&ctx.instance, &ctx.device);
-
-        let surface = window.create_surface(&ctx.entry, &ctx.instance);
+        let surface = window.create_surface(&ctx);
         let window_size = window.get_current_client_size();
-        let info =
-            SurfaceInfoForSwapchain::from(&instance, ctx.physical_device, surface, window_size)
-                .expect("failed to get info of surface for creating a swapchain");
-        let swapchain =
-            create_swapchain(&device, surface, &info, None).expect("failed to create a swapchain");
+        let info = SurfaceInfoForSwapchain::from(
+            &ctx.surface_loader(),
+            ctx.physical_device,
+            surface,
+            window_size,
+        )
+        .expect("failed to get info of surface for creating a swapchain");
+        let swapchain = create_swapchain(&ctx.swapchain_loader(), surface, &info, None)
+            .expect("failed to create a swapchain");
 
         Self {
             surface,
@@ -49,11 +46,12 @@ impl<'a> Swapchain<'a> {
 impl Drop for Swapchain<'_> {
     fn drop(&mut self) {
         unsafe {
-            let instance = surface::Instance::new(&self.ctx.entry, &self.ctx.instance);
-            let device = swapchain::Device::new(&self.ctx.instance, &self.ctx.device);
-
-            device.destroy_swapchain(self.swapchain, None);
-            instance.destroy_surface(self.surface, None);
+            self.ctx
+                .swapchain_loader()
+                .destroy_swapchain(self.swapchain, None);
+            self.ctx
+                .surface_loader()
+                .destroy_surface(self.surface, None);
         }
     }
 }

@@ -1,4 +1,7 @@
-use ash::{vk, *};
+use ash::{
+    khr::{self, surface, swapchain},
+    vk, *,
+};
 use std::{
     ffi::CStr,
     slice,
@@ -9,12 +12,12 @@ use std::{
 ///
 /// スレッドセーフ。
 pub struct Context {
-    pub entry: Arc<Entry>,
     pub instance: Instance,
     pub physical_device: vk::PhysicalDevice,
     pub queue_family_index: u32,
     pub device: Device,
     pub queue: Mutex<vk::Queue>,
+    entry: Arc<Entry>,
 }
 
 impl Context {
@@ -33,6 +36,19 @@ impl Context {
             device,
             queue,
         }
+    }
+
+    pub fn surface_loader(&self) -> surface::Instance {
+        surface::Instance::new(&self.entry, &self.instance)
+    }
+
+    pub fn swapchain_loader(&self) -> swapchain::Device {
+        swapchain::Device::new(&self.instance, &self.device)
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn win32_surface_loader(&self) -> khr::win32_surface::Instance {
+        khr::win32_surface::Instance::new(&self.entry, &self.instance)
     }
 }
 

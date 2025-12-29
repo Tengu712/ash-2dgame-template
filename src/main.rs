@@ -11,8 +11,7 @@ fn main() {
     let window = Window::new(WINDOW_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     let entry = Entry::linked();
-    let entry = Arc::new(entry);
-    let ctx = Context::new(Arc::clone(&entry), APPLICATION_NAME, APPLICATION_VERSION);
+    let ctx = Context::new(Arc::new(entry), APPLICATION_NAME, APPLICATION_VERSION);
     let ctx = Arc::new(ctx);
     let _ = Swapchain::new(Arc::clone(&ctx), &window);
     let _ = Submitter::new(Arc::clone(&ctx));
