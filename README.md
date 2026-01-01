@@ -33,12 +33,15 @@ cargo build
 classDiagram
     class Entry
     class Context
+    class Submitter
+    class RenderPass
     class Window
     class Swapchain
-    class Submitter
 
     Entry "1" -- "0..*" Context
     Context "1" -- "0..*" Submitter
+    Context "1" -- "0..*" RenderPass
     Context "1" -- "0..*" Swapchain
     Window "1" -- "1" Swapchain
+    Swapchain "0,1" -- "0..*" RenderPass
 ```
