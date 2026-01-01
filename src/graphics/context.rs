@@ -1,5 +1,6 @@
 use ash::{
     khr::{self, surface, swapchain},
+    prelude::VkResult,
     vk, *,
 };
 use std::{ffi::CStr, slice, sync::LazyLock};
@@ -41,6 +42,10 @@ impl Context {
             device,
             queue,
         }
+    }
+
+    pub fn wait_idle(&self) -> VkResult<()> {
+        unsafe { self.device.device_wait_idle() }
     }
 
     pub fn surface_loader(&self) -> surface::Instance {

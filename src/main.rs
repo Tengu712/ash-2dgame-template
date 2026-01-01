@@ -21,11 +21,30 @@ fn main() {
     let ctx = Context::new(APPLICATION_NAME, APPLICATION_VERSION);
     let ctx = Rc::new(ctx);
     let swapchain = Swapchain::new(Rc::clone(&ctx), Rc::clone(&window));
-    let _ = RenderPass::new(Rc::clone(&ctx), &swapchain).expect("failed to create a render pass");
-    let _ = Submitter::new(Rc::clone(&ctx));
+    let mut renderpass =
+        RenderPass::new(Rc::clone(&ctx), &swapchain).expect("failed to create a render pass");
+    let mut submitter = Submitter::new(Rc::clone(&ctx));
 
     while window.process_events() {
-        // DEBUG:
-        std::thread::sleep(std::time::Duration::from_millis(16));
+        // TODO: エラー復帰
+        let command_buffer = submitter
+            .prepare()
+            .expect("failed to prepare recording rendering commands");
+        let (index, semaphores) = renderpass
+            .record_render_commands(command_buffer.command_buffer())
+            .expect("failed to recording rendering commands");
+        let wait_infos = [(
+            semaphores.started_semaphore,
+            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+        )];
+        let signal_semaphores = [semaphores.finished_smaphore];
+        command_buffer
+            .submit(&wait_infos, &signal_semaphores)
+            .expect("failed to submit rendering commands");
+        swapchain
+            .queue_presentation_command(index, semaphores.finished_smaphore)
+            .expect("failed to queue a presentation command");
     }
+
+    let _ = ctx.wait_idle();
 }

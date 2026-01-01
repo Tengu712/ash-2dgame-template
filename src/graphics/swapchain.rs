@@ -1,7 +1,7 @@
 use super::{context::Context, image::wrap::ImageView};
 use crate::window::Window;
 use ash::{khr::swapchain, prelude::VkResult, vk};
-use std::rc::Rc;
+use std::{rc::Rc, slice};
 
 mod info;
 
@@ -57,6 +57,43 @@ impl Swapchain {
             image_views,
             ctx,
             window,
+        }
+    }
+
+    pub fn acquire_next_image_index(&self, signal_semaphore: vk::Semaphore) -> VkResult<u32> {
+        let (index, suboptimal) = unsafe {
+            self.ctx.swapchain_loader().acquire_next_image(
+                self.swapchain,
+                u64::MAX,
+                signal_semaphore,
+                vk::Fence::null(),
+            )?
+        };
+        if suboptimal {
+            Err(vk::Result::ERROR_OUT_OF_DATE_KHR)
+        } else {
+            Ok(index)
+        }
+    }
+
+    pub fn queue_presentation_command(
+        &self,
+        index: u32,
+        wait_semaphore: vk::Semaphore,
+    ) -> VkResult<()> {
+        let pi = vk::PresentInfoKHR::default()
+            .wait_semaphores(slice::from_ref(&wait_semaphore))
+            .swapchains(slice::from_ref(&self.swapchain))
+            .image_indices(slice::from_ref(&index));
+        let suboptimal = unsafe {
+            self.ctx
+                .swapchain_loader()
+                .queue_present(self.ctx.queue, &pi)?
+        };
+        if suboptimal {
+            Err(vk::Result::ERROR_OUT_OF_DATE_KHR)
+        } else {
+            Ok(())
         }
     }
 }
