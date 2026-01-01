@@ -22,12 +22,10 @@ pub struct Swapchain {
 
 impl Swapchain {
     pub fn new(ctx: Rc<Context>, window: Rc<Window>) -> Self {
-        let swapchain_loader = ctx.swapchain_loader();
-
         // surface
         #[cfg(target_os = "windows")]
         let surface = window
-            .create_surface(&ctx.win32_surface_loader())
+            .create_surface(&ctx.win32_surface_loader)
             .expect("failed to create the surface of the window");
 
         // swapchain
@@ -35,18 +33,18 @@ impl Swapchain {
             .get_current_client_size()
             .expect("failed to get the client size of the window");
         let info = SurfaceInfoForSwapchain::from(
-            &ctx.surface_loader(),
+            &ctx.surface_loader,
             ctx.physical_device,
             surface,
             window_size,
         )
         .expect("failed to get info of surface for creating a swapchain");
-        let swapchain = create_swapchain(&swapchain_loader, surface, &info, None)
+        let swapchain = create_swapchain(&ctx.swapchain_loader, surface, &info, None)
             .expect("failed to create a swapchain");
 
         // image views
         let image_views =
-            collect_image_views(&ctx, &swapchain_loader, swapchain, info.format.format)
+            collect_image_views(&ctx, &ctx.swapchain_loader, swapchain, info.format.format)
                 .expect("failed to collect the views of swapchain images");
 
         Self {
@@ -62,7 +60,7 @@ impl Swapchain {
 
     pub fn acquire_next_image_index(&self, signal_semaphore: vk::Semaphore) -> VkResult<u32> {
         let (index, suboptimal) = unsafe {
-            self.ctx.swapchain_loader().acquire_next_image(
+            self.ctx.swapchain_loader.acquire_next_image(
                 self.swapchain,
                 u64::MAX,
                 signal_semaphore,
@@ -87,7 +85,7 @@ impl Swapchain {
             .image_indices(slice::from_ref(&index));
         let suboptimal = unsafe {
             self.ctx
-                .swapchain_loader()
+                .swapchain_loader
                 .queue_present(self.ctx.queue, &pi)?
         };
         if suboptimal {
@@ -103,11 +101,9 @@ impl Drop for Swapchain {
         unsafe {
             self.image_views.clear();
             self.ctx
-                .swapchain_loader()
+                .swapchain_loader
                 .destroy_swapchain(self.swapchain, None);
-            self.ctx
-                .surface_loader()
-                .destroy_surface(self.surface, None);
+            self.ctx.surface_loader.destroy_surface(self.surface, None);
         }
     }
 }

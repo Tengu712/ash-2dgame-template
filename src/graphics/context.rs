@@ -26,6 +26,12 @@ pub struct Context {
     pub queue_family_index: u32,
     pub device: Device,
     pub queue: vk::Queue,
+
+    pub surface_loader: surface::Instance,
+    pub swapchain_loader: swapchain::Device,
+
+    #[cfg(target_os = "windows")]
+    pub win32_surface_loader: khr::win32_surface::Instance,
 }
 
 impl Context {
@@ -35,30 +41,28 @@ impl Context {
         let queue_family_index = find_graphics_queue_family_index(&instance, physical_device);
         let device = create_device(&instance, physical_device, queue_family_index);
         let queue = unsafe { device.get_device_queue(queue_family_index, 0) };
+
+        let surface_loader = surface::Instance::new(&ENTRY, &instance);
+        let swapchain_loader = swapchain::Device::new(&instance, &device);
+
+        #[cfg(target_os = "windows")]
+        let win32_surface_loader = khr::win32_surface::Instance::new(&ENTRY, &instance);
+
         Self {
             instance,
             physical_device,
             queue_family_index,
             device,
             queue,
+            surface_loader,
+            swapchain_loader,
+            #[cfg(target_os = "windows")]
+            win32_surface_loader,
         }
     }
 
     pub fn wait_idle(&self) -> VkResult<()> {
         unsafe { self.device.device_wait_idle() }
-    }
-
-    pub fn surface_loader(&self) -> surface::Instance {
-        surface::Instance::new(&ENTRY, &self.instance)
-    }
-
-    pub fn swapchain_loader(&self) -> swapchain::Device {
-        swapchain::Device::new(&self.instance, &self.device)
-    }
-
-    #[cfg(target_os = "windows")]
-    pub fn win32_surface_loader(&self) -> khr::win32_surface::Instance {
-        khr::win32_surface::Instance::new(&ENTRY, &self.instance)
     }
 }
 
