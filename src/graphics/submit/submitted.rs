@@ -15,6 +15,7 @@ impl<'a> SubmittedCommandBuffer<'a> {
         Self(submitter, false)
     }
 
+    #[allow(dead_code)]
     pub fn wait(mut self) -> VkResult<()> {
         unsafe {
             self.1 = true;
