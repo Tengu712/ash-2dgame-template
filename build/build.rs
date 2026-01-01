@@ -7,6 +7,7 @@ use std::{
 mod conan;
 #[cfg(target_os = "macos")]
 mod macos;
+mod shader;
 #[cfg(target_os = "windows")]
 mod windows;
 
@@ -52,6 +53,10 @@ fn main() {
     conan::install_dependencies();
     conan::print_link_info();
 
+    let config = conan::parse_config();
+
+    shader::compile_shader(config.get("GLSLANG_BIN").unwrap());
+
     #[cfg(target_os = "windows")]
     {
         windows::build_window_library();
@@ -59,7 +64,6 @@ fn main() {
     }
     #[cfg(target_os = "macos")]
     {
-        let config = conan::parse_config();
         // TODO: build_window_library()
         macos::copy_vulkan_dylib(config.get("VULKAN_LIB").unwrap());
         macos::print_link_info();

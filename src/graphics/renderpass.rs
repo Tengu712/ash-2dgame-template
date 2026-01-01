@@ -3,8 +3,10 @@ use ash::{Device, prelude::VkResult, vk};
 use std::rc::Rc;
 
 mod framebuffer;
+mod pipeline;
 
 use framebuffer::Framebuffer;
+use pipeline::Pipeline;
 
 struct FrameObject<'a> {
     framebuffer: Framebuffer<'a>,
@@ -32,6 +34,7 @@ pub struct RenderingSemaphores {
 
 pub struct RenderPass<'a> {
     pub render_pass: vk::RenderPass,
+    pipeline: Pipeline,
     frame_objects: Vec<FrameObject<'a>>,
 
     /// スワップチェーンイメージが利用可能になるまで待機するためのセマフォ
@@ -49,6 +52,12 @@ pub struct RenderPass<'a> {
 impl<'a> RenderPass<'a> {
     pub fn new(ctx: Rc<Context>, swapchain: &'a Swapchain) -> VkResult<Self> {
         let render_pass = create_render_pass(&ctx.device, swapchain.format.format)?;
+
+        let area = vk::Rect2D {
+            offset: vk::Offset2D { x: 0, y: 0 },
+            extent: swapchain.resolution,
+        };
+        let pipeline = Pipeline::new(Rc::clone(&ctx), render_pass, area)?;
 
         let image_count = swapchain.image_views.len();
 
@@ -73,6 +82,7 @@ impl<'a> RenderPass<'a> {
 
         Ok(Self {
             render_pass,
+            pipeline,
             frame_objects,
             started_semaphores,
             started_semaphores_counter: 0,
@@ -114,6 +124,18 @@ impl<'a> RenderPass<'a> {
                 .device
                 .cmd_begin_render_pass(command_buffer, &bi, vk::SubpassContents::INLINE)
         };
+
+        // パイプラインバインド
+        unsafe {
+            self.ctx.device.cmd_bind_pipeline(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline.pipeline,
+            )
+        };
+
+        // DEBUG:
+        unsafe { self.ctx.device.cmd_draw(command_buffer, 4, 1, 0, 0) };
 
         // レンダーパス終了
         unsafe { self.ctx.device.cmd_end_render_pass(command_buffer) };
