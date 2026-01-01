@@ -4,7 +4,7 @@ use std::{ffi::CStr, rc::Rc};
 mod graphics;
 mod window;
 
-use graphics::{context::Context, submit::Submitter, swapchain::Swapchain};
+use graphics::{context::Context, renderpass::RenderPass, submit::Submitter, swapchain::Swapchain};
 use window::Window;
 
 fn main() {
@@ -20,7 +20,8 @@ fn main() {
 
     let ctx = Context::new(APPLICATION_NAME, APPLICATION_VERSION);
     let ctx = Rc::new(ctx);
-    let _ = Swapchain::new(Rc::clone(&ctx), Rc::clone(&window));
+    let swapchain = Swapchain::new(Rc::clone(&ctx), Rc::clone(&window));
+    let _ = RenderPass::new(Rc::clone(&ctx), &swapchain).expect("failed to create a render pass");
     let _ = Submitter::new(Rc::clone(&ctx));
 
     while window.process_events() {
