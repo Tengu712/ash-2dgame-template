@@ -37,11 +37,14 @@ classDiagram
     class RenderPass
     class Window
     class Swapchain
+    class Framebuffer
 
     Entry "1" -- "0..*" Context
     Context "1" -- "0..*" Submitter
     Context "1" -- "0..*" RenderPass
     Context "1" -- "0..*" Swapchain
+    Context "1" -- "0..*" Framebuffer
     Window "1" -- "1" Swapchain
-    Swapchain "0,1" -- "0..*" RenderPass
+    Swapchain "0,1" -- "0..*" Framebuffer
+    Framebuffer "1..*" -- "1" RenderPass
 ```
