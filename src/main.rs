@@ -23,20 +23,34 @@ fn main() {
 
     let ctx = Context::new(APPLICATION_NAME, APPLICATION_VERSION);
     let ctx = Rc::new(ctx);
-    let swapchain = Swapchain::new(Rc::clone(&ctx), Rc::clone(&window));
+    let mut swapchain = Swapchain::new(Rc::clone(&ctx), Rc::clone(&window));
     let mut render_pass = RenderPass::new(
         Rc::clone(&ctx),
         swapchain.image_views.len(),
         swapchain.format.format,
     )
     .expect("failed to create a render pass");
-    let framebuffers = Framebuffer::from_swapchain(&ctx, render_pass.render_pass, &swapchain)
+    let mut framebuffers = Framebuffer::from_swapchain(&ctx, render_pass.render_pass, &swapchain)
         .expect("failed to create framebuffers");
     let mut submitter = Submitter::new(Rc::clone(&ctx));
 
+    let mut return_key_down_count = 0;
     while window.process_events() {
         if window.get_input_state(0x0D) {
-            window.toggle_fullscreen();
+            if return_key_down_count == 0 {
+                ctx.wait_idle().expect("failed to wait for idle");
+                window.toggle_fullscreen();
+                drop(framebuffers);
+                swapchain = swapchain
+                    .recreate()
+                    .expect("failed to recreate a swapchain");
+                framebuffers =
+                    Framebuffer::from_swapchain(&ctx, render_pass.render_pass, &swapchain)
+                        .expect("failed to recreate framebuffers");
+            }
+            return_key_down_count += 1;
+        } else {
+            return_key_down_count = 0;
         }
 
         // TODO: エラー復帰

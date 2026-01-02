@@ -18,6 +18,9 @@ pub struct Swapchain {
     pub image_views: Vec<ImageView>,
     ctx: Rc<Context>,
     window: Rc<Window>,
+
+    /// 再作成時に`surface`を破棄しないようにするためのフラグ
+    keep_surface: bool,
 }
 
 impl Swapchain {
@@ -55,7 +58,47 @@ impl Swapchain {
             image_views,
             ctx,
             window,
+            keep_surface: false,
         }
+    }
+
+    pub fn recreate(mut self) -> VkResult<Self> {
+        let window_size = self
+            .window
+            .get_current_client_size()
+            .ok_or(vk::Result::ERROR_UNKNOWN)?;
+        let info = SurfaceInfoForSwapchain::from(
+            &self.ctx.surface_loader,
+            self.ctx.physical_device,
+            self.surface,
+            window_size,
+        )?;
+        let swapchain = create_swapchain(
+            &self.ctx.swapchain_loader,
+            self.surface,
+            &info,
+            Some(self.swapchain),
+        )?;
+
+        let image_views = collect_image_views(
+            &self.ctx,
+            &self.ctx.swapchain_loader,
+            swapchain,
+            info.format.format,
+        )?;
+
+        self.keep_surface = true;
+
+        Ok(Self {
+            surface: self.surface,
+            resolution: info.resolution,
+            format: info.format,
+            swapchain,
+            image_views,
+            ctx: Rc::clone(&self.ctx),
+            window: Rc::clone(&self.window),
+            keep_surface: false,
+        })
     }
 
     pub fn acquire_next_image_index(&self, signal_semaphore: vk::Semaphore) -> VkResult<u32> {
@@ -103,7 +146,9 @@ impl Drop for Swapchain {
             self.ctx
                 .swapchain_loader
                 .destroy_swapchain(self.swapchain, None);
-            self.ctx.surface_loader.destroy_surface(self.surface, None);
+            if !self.keep_surface {
+                self.ctx.surface_loader.destroy_surface(self.surface, None);
+            }
         }
     }
 }
