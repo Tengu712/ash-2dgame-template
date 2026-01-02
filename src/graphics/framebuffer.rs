@@ -1,4 +1,4 @@
-use super::super::context::Context;
+use super::{context::Context, swapchain::Swapchain};
 use ash::{Device, prelude::VkResult, vk};
 use std::{marker::PhantomData, rc::Rc};
 
@@ -38,6 +38,22 @@ impl<'a> Framebuffer<'a> {
             ctx,
             _swapchain_image_view: PhantomData,
         })
+    }
+}
+
+impl<'a> Framebuffer<'a> {
+    pub fn from_swapchain(
+        ctx: &Rc<Context>,
+        render_pass: vk::RenderPass,
+        swapchain: &'a Swapchain,
+    ) -> VkResult<Vec<Self>> {
+        let width = swapchain.resolution.width;
+        let height = swapchain.resolution.height;
+        swapchain
+            .image_views
+            .iter()
+            .map(|image| Self::new(Rc::clone(ctx), render_pass, width, height, &image.view))
+            .collect()
     }
 }
 
