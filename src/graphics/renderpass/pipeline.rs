@@ -18,9 +18,9 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    pub fn new(ctx: Rc<Context>, render_pass: vk::RenderPass, area: vk::Rect2D) -> VkResult<Self> {
+    pub fn new(ctx: Rc<Context>, render_pass: vk::RenderPass) -> VkResult<Self> {
         let pipeline_layout = create_pipeline_layout(&ctx.device, &[])?;
-        let pipeline = create_pipeline(&ctx.device, render_pass, pipeline_layout, area)?;
+        let pipeline = create_pipeline(&ctx.device, render_pass, pipeline_layout)?;
         Ok(Self {
             pipeline_layout,
             pipeline,
@@ -52,7 +52,6 @@ fn create_pipeline(
     device: &Device,
     render_pass: vk::RenderPass,
     pipeline_layout: vk::PipelineLayout,
-    area: vk::Rect2D,
 ) -> VkResult<vk::Pipeline> {
     // shader stages
     let vs = create_shader_module(device, VERTEX_SHADER)?;
@@ -82,6 +81,10 @@ fn create_pipeline(
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .line_width(1.0);
 
+    // multisample state
+    let multisample_state = vk::PipelineMultisampleStateCreateInfo::default()
+        .rasterization_samples(vk::SampleCountFlags::TYPE_1);
+
     // color blend
     let color_blend_attachments = [vk::PipelineColorBlendAttachmentState {
         blend_enable: vk::TRUE,
@@ -97,22 +100,14 @@ fn create_pipeline(
         vk::PipelineColorBlendStateCreateInfo::default().attachments(&color_blend_attachments);
 
     // viewport state
-    let viewports = [vk::Viewport {
-        x: area.offset.x as f32,
-        y: area.offset.y as f32,
-        width: area.extent.width as f32,
-        height: area.extent.height as f32,
-        min_depth: 0.0,
-        max_depth: 1.0,
-    }];
-    let scissors = [area];
     let viewport_state = vk::PipelineViewportStateCreateInfo::default()
-        .viewports(&viewports)
-        .scissors(&scissors);
+        .viewport_count(1)
+        .scissor_count(1);
 
-    // multisample state
-    let multisample_state = vk::PipelineMultisampleStateCreateInfo::default()
-        .rasterization_samples(vk::SampleCountFlags::TYPE_1);
+    // dynamic state
+    let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
+    let dynamic_state =
+        vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic_states);
 
     // pipeline
     let ci = vk::GraphicsPipelineCreateInfo::default()
@@ -123,6 +118,7 @@ fn create_pipeline(
         .rasterization_state(&rasterization_state)
         .multisample_state(&multisample_state)
         .color_blend_state(&color_blend_state)
+        .dynamic_state(&dynamic_state)
         .layout(pipeline_layout)
         .render_pass(render_pass)
         .subpass(0);

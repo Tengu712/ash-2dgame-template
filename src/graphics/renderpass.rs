@@ -53,11 +53,7 @@ impl<'a> RenderPass<'a> {
     pub fn new(ctx: Rc<Context>, swapchain: &'a Swapchain) -> VkResult<Self> {
         let render_pass = create_render_pass(&ctx.device, swapchain.format.format)?;
 
-        let area = vk::Rect2D {
-            offset: vk::Offset2D { x: 0, y: 0 },
-            extent: swapchain.resolution,
-        };
-        let pipeline = Pipeline::new(Rc::clone(&ctx), render_pass, area)?;
+        let pipeline = Pipeline::new(Rc::clone(&ctx), render_pass)?;
 
         let image_count = swapchain.image_views.len();
 
@@ -132,6 +128,30 @@ impl<'a> RenderPass<'a> {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline.pipeline,
             )
+        };
+
+        // 現在のスワップチェーンイメージの解像度に合わせてビューポート設定
+        let viewports = [vk::Viewport {
+            x: 0.0,
+            y: 0.0,
+            width: self.swapchain.resolution.width as f32,
+            height: self.swapchain.resolution.height as f32,
+            min_depth: 0.0,
+            max_depth: 1.0,
+        }];
+        let scissors = [vk::Rect2D {
+            offset: vk::Offset2D::default(),
+            extent: self.swapchain.resolution,
+        }];
+        unsafe {
+            self.ctx
+                .device
+                .cmd_set_viewport(command_buffer, 0, &viewports)
+        };
+        unsafe {
+            self.ctx
+                .device
+                .cmd_set_scissor(command_buffer, 0, &scissors)
         };
 
         // DEBUG:
