@@ -5,13 +5,18 @@
 //! WARN: マルチスレッド対応をしていないため、必ず単一スレッドで動作すること。
 
 #include <cstdint>
+#include <unordered_map>
 #include <Windows.h>
 
 namespace {
 
 constexpr LPCWSTR WINDOW_CLASS_NAME = L"SkdWindow\0";
+constexpr DWORD WINDOW_STYLE = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
 
+int g_screenWidth  = 0;
+int g_screenHeight = 0;
 HWND g_window = nullptr;
+std::unordered_map<uint32_t, bool> g_inputStates{};
 
 LRESULT CALLBACK windowProc(HWND window, UINT msg, WPARAM wParam, LPARAM lParam) {
 	switch (msg) {
@@ -91,13 +96,16 @@ extern "C" void *get_window_handle() {
 ///
 /// 失敗時や既に作成済みの場合は0を返す。
 extern "C" uint8_t create_window(const wchar_t *title, uint32_t width, uint32_t height) {
-	constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+	if (g_window != nullptr) {
+		return 0;
+	}
+
 	const auto inst = GetModuleHandleW(nullptr);
 	if (!RegisterWindowClass(inst)) {
 		return 0;
 	}
 	int w, h;
-	adjustWindowSize(style, static_cast<int>(width), static_cast<int>(height), w, h);
+	adjustWindowSize(WINDOW_STYLE, static_cast<int>(width), static_cast<int>(height), w, h);
 	int x, y;
 	calculateWindowPlacement(w, h, x, y);
 
@@ -105,7 +113,7 @@ extern "C" uint8_t create_window(const wchar_t *title, uint32_t width, uint32_t 
 		0,
 		WINDOW_CLASS_NAME,
 		title,
-		style,
+		WINDOW_STYLE,
 		x,
 		y,
 		w,
@@ -122,7 +130,9 @@ extern "C" uint8_t create_window(const wchar_t *title, uint32_t width, uint32_t 
 	ShowWindow(window, SW_SHOWDEFAULT);
 	UpdateWindow(window);
 
-	g_window = window;
+	g_screenWidth  = w;
+	g_screenHeight = h;
+	g_window       = window;
 	return 1;
 }
 
@@ -155,6 +165,12 @@ extern "C" uint8_t process_window_events() {
 		if (msg.message == WM_QUIT) {
 			return 0;
 		}
+		else if (msg.message == WM_KEYDOWN) {
+			g_inputStates[msg.wParam] = true;
+		}
+		else if (msg.message == WM_KEYUP) {
+			g_inputStates[msg.wParam] = false;
+		}
 		TranslateMessage(&msg);
 		DispatchMessageW(&msg);
 	}
@@ -177,4 +193,45 @@ extern "C" WindowSize get_current_client_size() {
 		static_cast<uint32_t>(rect.right  - rect.left),
 		static_cast<uint32_t>(rect.bottom - rect.top),
 	};
+}
+
+/// フルスクリーン状態をトグルする関数
+extern "C" void toggle_fullscreen() {
+	if (g_window == nullptr) {
+		return;
+	}
+
+	DWORD dwStyle = GetWindowLongW(g_window, GWL_STYLE);
+	if (dwStyle & WS_CAPTION) {
+		// フルスクリーンにする
+		MONITORINFO mi{sizeof(MONITORINFO)};
+		if (GetMonitorInfoW(MonitorFromWindow(g_window, MONITOR_DEFAULTTOPRIMARY), &mi)) {
+			SetWindowLongW(g_window, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+			SetWindowPos(
+				g_window,
+				HWND_TOP,
+				mi.rcMonitor.left, mi.rcMonitor.top,
+				mi.rcMonitor.right - mi.rcMonitor.left,
+				mi.rcMonitor.bottom - mi.rcMonitor.top,
+				SWP_NOOWNERZORDER | SWP_FRAMECHANGED
+			);
+		}
+	} else {
+		// ウィンドウにする
+		int w, h;
+		adjustWindowSize(WINDOW_STYLE, g_screenWidth, g_screenHeight, w, h);
+		int x, y;
+		calculateWindowPlacement(w, h, x, y);
+		SetWindowLongW(g_window, GWL_STYLE, WINDOW_STYLE | WS_VISIBLE);
+		SetWindowPos(g_window, nullptr, x, y, w, h, SWP_FRAMECHANGED);
+	}
+}
+
+/// 現在のキー入力状態を取得する関数
+extern "C" uint8_t get_input_state(uint32_t code) {
+	if (g_inputStates.count(code) > 0) {
+		return static_cast<uint8_t>(g_inputStates[code]);
+	} else {
+		return 0;
+	}
 }

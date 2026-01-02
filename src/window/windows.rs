@@ -54,6 +54,14 @@ impl Window {
             win32_surface_loader.create_win32_surface(&ci, None)
         }
     }
+
+    pub fn toggle_fullscreen(&self) {
+        unsafe { toggle_fullscreen() };
+    }
+
+    pub fn get_input_state(&self, code: u32) -> bool {
+        unsafe { get_input_state(code) != 0 }
+    }
 }
 
 impl Drop for Window {
@@ -77,4 +85,6 @@ unsafe extern "C" {
     fn destroy_window();
     fn process_window_events() -> u8;
     fn get_current_client_size() -> WindowSize;
+    fn toggle_fullscreen();
+    fn get_input_state(code: u32) -> u8;
 }

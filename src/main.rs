@@ -35,6 +35,10 @@ fn main() {
     let mut submitter = Submitter::new(Rc::clone(&ctx));
 
     while window.process_events() {
+        if window.get_input_state(0x0D) {
+            window.toggle_fullscreen();
+        }
+
         // TODO: エラー復帰
 
         let recording_render_pass = render_pass.prepare();
