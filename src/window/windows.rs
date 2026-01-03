@@ -8,6 +8,22 @@ use std::{ffi::c_void, iter, marker::PhantomData};
 pub struct Window(PhantomData<*const ()>);
 
 impl Window {
+    // エラーダイアログを表示する関数
+    //
+    // HACK: ウィンドウとは関係がないので本来は関数にすべきだが、
+    //       本モジュールのトップレベルで定義するとFFI宣言と名前衝突を起こし、
+    //       FFI宣言を別モジュールに切り出すのも億劫なので、
+    //       連関関数として定義している。
+    pub fn show_error_dialog(message: &str) {
+        let message = message
+            .encode_utf16()
+            .chain(iter::once(0))
+            .collect::<Vec<_>>();
+        unsafe { show_error_dialog(message.as_ptr()) };
+    }
+}
+
+impl Window {
     pub fn new(title: &str, width: u32, height: u32) -> Self {
         let title = title
             .encode_utf16()
@@ -79,6 +95,7 @@ struct WindowSize {
 
 #[link(name = "window", kind = "static")]
 unsafe extern "C" {
+    fn show_error_dialog(message: *const u16);
     fn get_instance_handle() -> *mut c_void;
     fn get_window_handle() -> *mut c_void;
     fn create_window(title: *const u16, width: u32, height: u32) -> u8;

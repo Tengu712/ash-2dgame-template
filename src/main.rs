@@ -1,6 +1,6 @@
 use ash::vk;
 use fern::Dispatch;
-use std::{ffi::CStr, rc::Rc, time::SystemTime};
+use std::{ffi::CStr, fmt::Display, rc::Rc, time::SystemTime};
 
 mod graphics;
 mod window;
@@ -10,6 +10,25 @@ use graphics::{
     swapchain::Swapchain,
 };
 use window::Window;
+
+trait LoggableResult<T, E> {
+    /// `Err`であればロギングとエラーダイアログ表示を行う`unwrap()`
+    fn expect_log(self, message: &str) -> T;
+}
+
+impl<T, E: Display> LoggableResult<T, E> for Result<T, E> {
+    fn expect_log(self, message: &str) -> T {
+        match self {
+            Ok(t) => t,
+            Err(e) => {
+                let message = format!("{message}: {e}");
+                log::error!("{message}");
+                Window::show_error_dialog(&message);
+                panic!("{message}");
+            }
+        }
+    }
+}
 
 fn main() {
     const WINDOW_TITLE: &str = "ash-2dgame-template";
@@ -28,9 +47,9 @@ fn main() {
                 message
             ))
         })
-        .chain(fern::log_file("log.txt").expect("failed to chain log.txt"))
+        .chain(fern::log_file("log.txt").expect_log("failed to chain log.txt"))
         .apply()
-        .expect("failed to initialize logger");
+        .expect_log("failed to initialize logger");
 
     let window = Window::new(WINDOW_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT);
     let window = Rc::new(window);

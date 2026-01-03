@@ -80,6 +80,11 @@ void calculateWindowPlacement(int w, int h, int &x, int &y) {
 
 } // namespace
 
+/// エラーメッセージダイアログを表示する関数
+extern "C" void show_error_dialog(const wchar_t *message) {
+	MessageBoxW(nullptr, message, L"ERROR", MB_ICONERROR | MB_OK);
+}
+
 /// インスタンスハンドルを取得する関数
 extern "C" void *get_instance_handle() {
 	return GetModuleHandleW(nullptr);
