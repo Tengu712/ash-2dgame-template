@@ -12,17 +12,21 @@ const FRAGMENT_SHADER: &[u8] = include_bytes!(concat!(
 ));
 
 pub struct Pipeline {
-    pub pipeline_layout: vk::PipelineLayout,
+    pub layout: vk::PipelineLayout,
     pub pipeline: vk::Pipeline,
     ctx: Rc<Context>,
 }
 
 impl Pipeline {
-    pub fn new(ctx: Rc<Context>, render_pass: vk::RenderPass) -> VkResult<Self> {
-        let pipeline_layout = create_pipeline_layout(&ctx.device, &[])?;
-        let pipeline = create_pipeline(&ctx.device, render_pass, pipeline_layout)?;
+    pub fn new(
+        ctx: Rc<Context>,
+        render_pass: vk::RenderPass,
+        set_layouts: &[vk::DescriptorSetLayout],
+    ) -> VkResult<Self> {
+        let layout = create_pipeline_layout(&ctx.device, set_layouts)?;
+        let pipeline = create_pipeline(&ctx.device, render_pass, layout)?;
         Ok(Self {
-            pipeline_layout,
+            layout,
             pipeline,
             ctx,
         })
@@ -35,7 +39,7 @@ impl Drop for Pipeline {
             self.ctx.device.destroy_pipeline(self.pipeline, None);
             self.ctx
                 .device
-                .destroy_pipeline_layout(self.pipeline_layout, None);
+                .destroy_pipeline_layout(self.layout, None);
         }
     }
 }
@@ -51,7 +55,7 @@ fn create_pipeline_layout(
 fn create_pipeline(
     device: &Device,
     render_pass: vk::RenderPass,
-    pipeline_layout: vk::PipelineLayout,
+    layout: vk::PipelineLayout,
 ) -> VkResult<vk::Pipeline> {
     // shader stages
     let vs = create_shader_module(device, VERTEX_SHADER)?;
@@ -119,7 +123,7 @@ fn create_pipeline(
         .multisample_state(&multisample_state)
         .color_blend_state(&color_blend_state)
         .dynamic_state(&dynamic_state)
-        .layout(pipeline_layout)
+        .layout(layout)
         .render_pass(render_pass)
         .subpass(0);
     let pipelines =

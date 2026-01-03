@@ -17,6 +17,7 @@ version = "0.1.0"
 dependencies = [
  "ash",
  "fern",
+ "glam",
  "humantime",
  "log",
 ]
@@ -35,6 +36,12 @@ checksum = "4316185f709b23713e41e3195f90edef7fb00c3ed4adc79769cf09cc762a3b29"
 dependencies = [
  "log",
 ]
+
+[[package]]
+name = "glam"
+version = "0.30.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd47b05dddf0005d850e5644cae7f2b14ac3df487979dbfff3b56f20b1a6ae46"
 
 [[package]]
 name = "humantime"

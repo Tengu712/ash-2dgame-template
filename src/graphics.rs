@@ -1,5 +1,6 @@
 pub mod buffer;
 pub mod context;
+pub mod descriptor;
 pub mod framebuffer;
 pub mod image;
 pub mod renderpass;

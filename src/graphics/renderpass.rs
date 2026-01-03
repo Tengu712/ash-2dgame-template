@@ -1,12 +1,10 @@
-use super::context::Context;
+use super::{context::Context, framebuffer::Framebuffer};
 use ash::{Device, prelude::VkResult, vk};
 use std::rc::Rc;
 
-mod pipeline;
-pub mod recording;
+pub mod pipeline;
 
 use pipeline::Pipeline;
-use recording::RecordingRenderPass;
 
 #[derive(Clone, Copy)]
 pub struct Semaphores {
@@ -22,13 +20,13 @@ pub struct Semaphores {
 
 pub struct RenderPass {
     pub render_pass: vk::RenderPass,
-    pipeline: Pipeline,
-    semaphores: Vec<Semaphores>,
+    pub pipeline: Pipeline,
 
     /// セマフォを順繰りに取得するためのインデックスカウンタ
     ///
     /// NOTE: 実際に利用可能になるスワップチェーンイメージのインデックスとは無関係。
     semaphores_counter: usize,
+    semaphores: Vec<Semaphores>,
 
     ctx: Rc<Context>,
 }
@@ -39,9 +37,14 @@ impl RenderPass {
     /// * ctx - コンテキスト
     /// * image_count - スワップチェーンイメージの個数
     /// * format - スワップチェーンイメージのフォーマット
-    pub fn new(ctx: Rc<Context>, image_count: usize, format: vk::Format) -> VkResult<Self> {
+    pub fn new(
+        ctx: Rc<Context>,
+        image_count: usize,
+        format: vk::Format,
+        set_layouts: &[vk::DescriptorSetLayout],
+    ) -> VkResult<Self> {
         let render_pass = create_render_pass(&ctx.device, format)?;
-        let pipeline = Pipeline::new(Rc::clone(&ctx), render_pass)?;
+        let pipeline = Pipeline::new(Rc::clone(&ctx), render_pass, set_layouts)?;
         let mut semaphores = Vec::with_capacity(image_count);
         for _ in 0..image_count {
             semaphores.push(Semaphores {
@@ -58,8 +61,64 @@ impl RenderPass {
         })
     }
 
-    pub fn prepare<'a>(&'a mut self) -> RecordingRenderPass<'a> {
-        RecordingRenderPass(self)
+    /// 現在のフレームのセマフォを取得する関数
+    ///
+    /// CAUTION: 必ず`record_render_commands()`よりも前に呼び出し、かつ後に呼び出さないこと。
+    /// CAUTION: フレームをまたいで使いまわさないこと。
+    pub fn semaphores(&mut self) -> Semaphores {
+        self.semaphores_counter = (self.semaphores_counter + 1) % self.semaphores.len();
+        self.semaphores[self.semaphores_counter]
+    }
+
+    pub fn record_render_commands(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        framebuffer: &Framebuffer,
+        area: vk::Rect2D,
+    ) -> VkResult<()> {
+        unsafe {
+            // レンダーパス開始
+            let bi = vk::RenderPassBeginInfo::default()
+                .render_pass(self.render_pass)
+                .framebuffer(framebuffer.framebuffer)
+                .render_area(area)
+                .clear_values(&framebuffer.clear_colors);
+            self.ctx
+                .device
+                .cmd_begin_render_pass(command_buffer, &bi, vk::SubpassContents::INLINE);
+
+            // パイプラインバインド
+            self.ctx.device.cmd_bind_pipeline(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline.pipeline,
+            );
+
+            // ビューポート設定
+            let viewports = [vk::Viewport {
+                x: area.offset.x as f32,
+                y: area.offset.y as f32,
+                width: area.extent.width as f32,
+                height: area.extent.height as f32,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            }];
+            let scissors = [area];
+            self.ctx
+                .device
+                .cmd_set_viewport(command_buffer, 0, &viewports);
+            self.ctx
+                .device
+                .cmd_set_scissor(command_buffer, 0, &scissors);
+
+            // DEBUG:
+            self.ctx.device.cmd_draw(command_buffer, 4, 1, 0, 0);
+
+            // レンダーパス終了
+            self.ctx.device.cmd_end_render_pass(command_buffer);
+
+            Ok(())
+        }
     }
 }
 

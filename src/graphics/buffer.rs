@@ -1,8 +1,11 @@
 use super::context::Context;
 use ash::{Device, prelude::VkResult, vk};
 
-pub mod array;
-pub mod single;
+mod array;
+mod single;
+
+pub use array::ArrayBuffer;
+pub use single::Buffer;
 
 fn create_buffer(
     device: &Device,

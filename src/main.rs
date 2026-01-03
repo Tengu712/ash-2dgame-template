@@ -1,4 +1,5 @@
 use ash::{prelude::VkResult, vk};
+use glam::{Mat4, Vec4};
 use std::{ffi::CStr, rc::Rc};
 
 mod graphics;
@@ -7,7 +8,14 @@ mod logs;
 mod window;
 
 use graphics::{
-    context::Context, framebuffer::Framebuffer, renderpass::RenderPass, submit::Submitter,
+    context::Context,
+    descriptor::{
+        Descriptors,
+        transform::{Camera, Instance},
+    },
+    framebuffer::Framebuffer,
+    renderpass::RenderPass,
+    submit::Submitter,
     swapchain::Swapchain,
 };
 use input::{InputStates, Key};
@@ -21,6 +29,8 @@ fn main() {
 
     const APPLICATION_NAME: &CStr = c"ash-2dgame-template";
     const APPLICATION_VERSION: u32 = vk::make_api_version(0, 0, 1, 0);
+
+    const MAX_INSTANCE_COUNT: usize = 32;
 
     // ロガー初期化
     logs::setup_logger();
@@ -37,14 +47,36 @@ fn main() {
     let ctx = Rc::new(ctx);
     let mut submitter = Submitter::new(Rc::clone(&ctx));
     let mut swapchain = Swapchain::new(Rc::clone(&ctx), Rc::clone(&window));
+    let descriptors = Descriptors::new(Rc::clone(&ctx), MAX_INSTANCE_COUNT);
     let mut render_pass = RenderPass::new(
         Rc::clone(&ctx),
         swapchain.image_views.len(),
         swapchain.format.format,
+        &descriptors.collect_set_layouts(),
     )
     .expect_log("failed to create a render pass");
     let mut framebuffers = Framebuffer::from_swapchain(&ctx, render_pass.render_pass, &swapchain)
         .expect_log("failed to create framebuffers");
+
+    // DEBUG:
+    let instance = Instance {
+        transform: Mat4::IDENTITY,
+        color: Vec4::new(1.0, 0.0, 0.0, 1.0),
+    };
+    let camera = Camera {
+        proj: Mat4::IDENTITY,
+        view: Mat4::IDENTITY,
+    };
+    descriptors
+        .trans
+        .insts_buffer
+        .copy_to_memory(&[instance], 0)
+        .expect_log("failed to upload a instance");
+    descriptors
+        .trans
+        .camera_buffer
+        .copy_to_memory(&camera)
+        .expect_log("failed to upload a camera");
 
     // メインループ
     while window.process_events() {
@@ -54,7 +86,13 @@ fn main() {
         // 描画
         let result = toggle_fullscreen_if_needed(&window, &input_states, &ctx);
         let result = result.and_then(|_| {
-            render_frame(&mut submitter, &swapchain, &mut render_pass, &framebuffers)
+            render_frame(
+                &mut submitter,
+                &swapchain,
+                &mut render_pass,
+                &framebuffers,
+                &descriptors,
+            )
         });
         match result {
             Ok(()) => (),
@@ -93,11 +131,11 @@ fn render_frame<'a>(
     swapchain: &'a Swapchain,
     render_pass: &mut RenderPass,
     framebuffers: &[Framebuffer<'a>],
+    descriptors: &Descriptors,
 ) -> VkResult<()> {
     // 準備
-    let recording_render_pass = render_pass.prepare();
-    let index = swapchain
-        .acquire_next_image_index(recording_render_pass.swapchain_image_started_semaphore())?;
+    let semaphores = render_pass.semaphores();
+    let index = swapchain.acquire_next_image_index(semaphores.started_semaphore)?;
     let framebuffer = &framebuffers[index as usize];
     let area = vk::Rect2D {
         offset: vk::Offset2D::default(),
@@ -106,11 +144,11 @@ fn render_frame<'a>(
 
     // 記録&提出
     let command_buffer = submitter.prepare()?;
-    let semaphores = recording_render_pass.record_render_commands(
+    descriptors.record_bind_command(
         command_buffer.command_buffer(),
-        framebuffer,
-        area,
-    )?;
+        render_pass.pipeline.layout,
+    );
+    render_pass.record_render_commands(command_buffer.command_buffer(), framebuffer, area)?;
     command_buffer.submit(
         &[(
             semaphores.started_semaphore,
