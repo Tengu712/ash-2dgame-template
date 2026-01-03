@@ -19,7 +19,10 @@ fn create_buffer(
 fn allocate_memory(ctx: &Context, buffer: vk::Buffer) -> VkResult<vk::DeviceMemory> {
     let reqs = unsafe { ctx.device.get_buffer_memory_requirements(buffer) };
     let memory_type_index = ctx
-        .find_memory_type_index(reqs.memory_type_bits, vk::MemoryPropertyFlags::HOST_VISIBLE)
+        .find_memory_type_index(
+            reqs.memory_type_bits,
+            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        )
         .ok_or(vk::Result::ERROR_OUT_OF_DEVICE_MEMORY)?;
     let ai = vk::MemoryAllocateInfo::default()
         .allocation_size(reqs.size)
