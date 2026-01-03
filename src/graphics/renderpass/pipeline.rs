@@ -37,9 +37,7 @@ impl Drop for Pipeline {
     fn drop(&mut self) {
         unsafe {
             self.ctx.device.destroy_pipeline(self.pipeline, None);
-            self.ctx
-                .device
-                .destroy_pipeline_layout(self.layout, None);
+            self.ctx.device.destroy_pipeline_layout(self.layout, None);
         }
     }
 }

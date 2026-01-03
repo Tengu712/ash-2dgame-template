@@ -144,10 +144,7 @@ fn render_frame<'a>(
 
     // 記録&提出
     let command_buffer = submitter.prepare()?;
-    descriptors.record_bind_command(
-        command_buffer.command_buffer(),
-        render_pass.pipeline.layout,
-    );
+    descriptors.record_bind_command(command_buffer.command_buffer(), render_pass.pipeline.layout);
     render_pass.record_render_commands(command_buffer.command_buffer(), framebuffer, area)?;
     command_buffer.submit(
         &[(
