@@ -1,5 +1,5 @@
 use super::{context::Context, image::wrap::ImageView};
-use crate::window::Window;
+use crate::{logs::*, window::Window};
 use ash::{khr::swapchain, prelude::VkResult, vk};
 use std::{rc::Rc, slice};
 
@@ -29,26 +29,26 @@ impl Swapchain {
         #[cfg(target_os = "windows")]
         let surface = window
             .create_surface(&ctx.win32_surface_loader)
-            .expect("failed to create the surface of the window");
+            .expect_log("failed to create the surface of the window");
 
         // swapchain
         let window_size = window
             .get_current_client_size()
-            .expect("failed to get the client size of the window");
+            .expect_log("failed to get the client size of the window");
         let info = SurfaceInfoForSwapchain::from(
             &ctx.surface_loader,
             ctx.physical_device,
             surface,
             window_size,
         )
-        .expect("failed to get info of surface for creating a swapchain");
+        .expect_log("failed to get info of surface for creating a swapchain");
         let swapchain = create_swapchain(&ctx.swapchain_loader, surface, &info, None)
-            .expect("failed to create a swapchain");
+            .expect_log("failed to create a swapchain");
 
         // image views
         let image_views =
             collect_image_views(&ctx, &ctx.swapchain_loader, swapchain, info.format.format)
-                .expect("failed to collect the views of swapchain images");
+                .expect_log("failed to collect the views of swapchain images");
 
         Self {
             surface,

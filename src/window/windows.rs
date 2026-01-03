@@ -1,3 +1,4 @@
+use crate::logs::*;
 use ash::{khr::win32_surface::Instance, prelude::VkResult, vk};
 use std::{ffi::c_void, iter, marker::PhantomData};
 
@@ -31,7 +32,7 @@ impl Window {
             .collect::<Vec<_>>();
         let result = unsafe { create_window(title.as_ptr(), width, height) };
         if result == 0 {
-            panic!("failed to create a window");
+            panic_log("failed to create a window");
         }
         Self(PhantomData)
     }

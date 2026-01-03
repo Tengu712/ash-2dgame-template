@@ -1,3 +1,4 @@
+use crate::logs::*;
 use ash::{
     khr::{self, surface, swapchain},
     prelude::VkResult,
@@ -130,7 +131,7 @@ fn create_instance(entry: &Entry, app_name: &CStr, app_version: u32) -> Instance
     unsafe {
         entry
             .create_instance(&ci, None)
-            .expect("failed to create a Vulkan instance")
+            .expect_log("failed to create a Vulkan instance")
     }
 }
 
@@ -141,7 +142,7 @@ fn select_physical_device(instance: &Instance) -> vk::PhysicalDevice {
     let physical_devices = unsafe {
         instance
             .enumerate_physical_devices()
-            .expect("failed to enumerate physical devices")
+            .expect_log("failed to enumerate physical devices")
     };
     physical_devices
         .into_iter()
@@ -158,7 +159,7 @@ fn select_physical_device(instance: &Instance) -> vk::PhysicalDevice {
                 .unwrap_or(0);
             (is_discrete, vram)
         })
-        .expect("failed to find any physical device")
+        .expect_log("failed to find any physical device")
 }
 
 fn find_graphics_queue_family_index(
@@ -171,7 +172,7 @@ fn find_graphics_queue_family_index(
             .iter()
             .enumerate()
             .find(|(_, prop)| prop.queue_flags.contains(vk::QueueFlags::GRAPHICS))
-            .expect("failed to find any graphics queue family index")
+            .expect_log("failed to find any graphics queue family index")
             .0 as u32
     }
 }
@@ -191,6 +192,6 @@ fn create_device(
     unsafe {
         instance
             .create_device(physical_device, &ci, None)
-            .expect("failed to create a Vulkan device")
+            .expect_log("failed to create a Vulkan device")
     }
 }

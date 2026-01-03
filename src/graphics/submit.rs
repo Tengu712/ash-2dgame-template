@@ -1,4 +1,5 @@
 use super::context::Context;
+use crate::logs::*;
 use ash::{Device, prelude::VkResult, vk};
 use std::{marker::PhantomData, rc::Rc};
 
@@ -65,7 +66,7 @@ fn create_command_pool(device: &Device, queue_family_index: u32) -> vk::CommandP
     unsafe {
         device
             .create_command_pool(&ci, None)
-            .expect("failed to create a command pool")
+            .expect_log("failed to create a command pool")
     }
 }
 
@@ -77,7 +78,7 @@ fn allocate_command_buffer(device: &Device, command_pool: vk::CommandPool) -> vk
     unsafe {
         device
             .allocate_command_buffers(&ai)
-            .expect("failed to allocate a command buffer for a submitter")[0]
+            .expect_log("failed to allocate a command buffer for a submitter")[0]
     }
 }
 
@@ -86,6 +87,6 @@ fn create_fence(device: &Device) -> vk::Fence {
     unsafe {
         device
             .create_fence(&ci, None)
-            .expect("failed to create a fence for a submitter")
+            .expect_log("failed to create a fence for a submitter")
     }
 }
