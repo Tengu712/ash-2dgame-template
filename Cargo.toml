@@ -6,3 +6,6 @@ build = "build/build.rs"
 
 [dependencies]
 ash = { version = "0.38.0", features = ["std", "linked", "debug"] }
+fern = "0.7"
+humantime = "2.1"
+log = "0.4"

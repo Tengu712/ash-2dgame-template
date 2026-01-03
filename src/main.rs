@@ -1,5 +1,6 @@
 use ash::vk;
-use std::{ffi::CStr, rc::Rc};
+use fern::Dispatch;
+use std::{ffi::CStr, rc::Rc, time::SystemTime};
 
 mod graphics;
 mod window;
@@ -17,6 +18,19 @@ fn main() {
 
     const APPLICATION_NAME: &CStr = c"ash-2dgame-template";
     const APPLICATION_VERSION: u32 = vk::make_api_version(0, 0, 1, 0);
+
+    Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {}] {}",
+                humantime::format_rfc3339(SystemTime::now()),
+                record.level(),
+                message
+            ))
+        })
+        .chain(fern::log_file("log.txt").expect("failed to chain log.txt"))
+        .apply()
+        .expect("failed to initialize logger");
 
     let window = Window::new(WINDOW_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT);
     let window = Rc::new(window);
