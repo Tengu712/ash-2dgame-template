@@ -23,9 +23,25 @@ LRESULT CALLBACK windowProc(HWND window, UINT msg, WPARAM wParam, LPARAM lParam)
 		case WM_DESTROY:
 			PostQuitMessage(0);
 			return 0;
-		default:
-			return DefWindowProcW(window, msg, wParam, lParam);
+		case WM_KEYDOWN:
+			g_inputStates[wParam] = true;
+			return 0;
+		case WM_KEYUP:
+			g_inputStates[wParam] = false;
+			return 0;
+		case WM_SYSKEYDOWN:
+			g_inputStates[wParam] = true;
+			return 0;
+		case WM_SYSKEYUP:
+			g_inputStates[wParam] = false;
+			return 0;
+		case WM_SYSCOMMAND:
+			if ((wParam & 0xFFF0) == SC_KEYMENU) {
+				return 0;
+			}
+			break;
 	}
+	return DefWindowProcW(window, msg, wParam, lParam);
 }
 
 bool RegisterWindowClass(HINSTANCE inst) {
@@ -169,12 +185,6 @@ extern "C" uint8_t process_window_events() {
 		}
 		if (msg.message == WM_QUIT) {
 			return 0;
-		}
-		else if (msg.message == WM_KEYDOWN) {
-			g_inputStates[msg.wParam] = true;
-		}
-		else if (msg.message == WM_KEYUP) {
-			g_inputStates[msg.wParam] = false;
 		}
 		TranslateMessage(&msg);
 		DispatchMessageW(&msg);

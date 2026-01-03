@@ -2,6 +2,7 @@ use ash::{prelude::VkResult, vk};
 use std::{ffi::CStr, rc::Rc};
 
 mod graphics;
+mod input;
 mod logs;
 mod window;
 
@@ -9,6 +10,7 @@ use graphics::{
     context::Context, framebuffer::Framebuffer, renderpass::RenderPass, submit::Submitter,
     swapchain::Swapchain,
 };
+use input::{InputStates, Key};
 use logs::*;
 use window::Window;
 
@@ -27,6 +29,9 @@ fn main() {
     let window = Window::new(WINDOW_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT);
     let window = Rc::new(window);
 
+    // 入力状態管理オブジェクト作成
+    let mut input_states = InputStates::default();
+
     // 描画用オブジェクト作成
     let ctx = Context::new(APPLICATION_NAME, APPLICATION_VERSION);
     let ctx = Rc::new(ctx);
@@ -43,7 +48,11 @@ fn main() {
 
     // メインループ
     while window.process_events() {
-        let result = toggle_fullscreen_if_needed(&window, &ctx);
+        // 入力状態更新
+        input_states.update(&window);
+
+        // 描画
+        let result = toggle_fullscreen_if_needed(&window, &input_states, &ctx);
         let result = result.and_then(|_| {
             render_frame(&mut submitter, &swapchain, &mut render_pass, &framebuffers)
         });
@@ -65,8 +74,12 @@ fn main() {
     let _ = ctx.wait_idle();
 }
 
-fn toggle_fullscreen_if_needed(window: &Window, ctx: &Context) -> VkResult<()> {
-    if window.get_input_state(0x0D) {
+fn toggle_fullscreen_if_needed(
+    window: &Window,
+    input_states: &InputStates,
+    ctx: &Context,
+) -> VkResult<()> {
+    if input_states.get(Key::Menu) > 0 && input_states.get(Key::Return) == 1 {
         ctx.wait_idle()?;
         window.toggle_fullscreen();
         Err(vk::Result::ERROR_OUT_OF_DATE_KHR)
