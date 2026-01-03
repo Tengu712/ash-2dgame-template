@@ -24,11 +24,11 @@ layout(location = 1) out vec4 outColor;
 /// NOTE: このシェーダを使う場合、
 ///       必ず`ash::Device::draw()`を用い、かつ第2引数(`vertex_count`)に`4`を指定すること。
 void main() {
-	vec2 uv = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2);
+	vec2 uv = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2) / 2.0;
 	outUV    = uv;
 	outColor = instances[gl_InstanceIndex].color;
 	gl_Position = camera.proj
 		* camera.view
 		* instances[gl_InstanceIndex].transform
-		* vec4(uv * 2.0 - 1.0, 0.0, 1.0);
+		* vec4(uv - 0.5, 0.0, 1.0);
 }

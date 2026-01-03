@@ -1,5 +1,5 @@
 use ash::{prelude::VkResult, vk};
-use glam::{Mat4, Vec4};
+use glam::{Mat4, Vec3, Vec4};
 use std::{ffi::CStr, rc::Rc};
 
 mod graphics;
@@ -60,11 +60,18 @@ fn main() {
 
     // DEBUG:
     let instance = Instance {
-        transform: Mat4::IDENTITY,
+        transform: Mat4::from_scale(Vec3::new(640.0, 480.0, 1.0)),
         color: Vec4::new(1.0, 0.0, 0.0, 1.0),
     };
     let camera = Camera {
-        proj: Mat4::IDENTITY,
+        proj: Mat4::orthographic_rh(
+            0.0,
+            SCREEN_WIDTH as f32,
+            0.0,
+            SCREEN_HEIGHT as f32,
+            0.0,
+            100.0,
+        ),
         view: Mat4::IDENTITY,
     };
     descriptors
