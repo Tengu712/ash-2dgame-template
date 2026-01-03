@@ -122,7 +122,7 @@ fn create_instance(entry: &Entry, app_name: &CStr, app_version: u32) -> Instance
     let ai = vk::ApplicationInfo::default()
         .application_name(app_name)
         .application_version(app_version)
-        .api_version(vk::make_api_version(0, 1, 0, 0));
+        .api_version(vk::make_api_version(0, 1, 1, 0));
     let ci = vk::InstanceCreateInfo::default()
         .flags(flags)
         .application_info(&ai)
