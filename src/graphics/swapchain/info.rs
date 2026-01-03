@@ -21,8 +21,7 @@ const DESIRED_FORMATS: &[vk::SurfaceFormatKHR] = &[
     },
 ];
 
-const DESIRED_PRESENT_MODE: vk::PresentModeKHR = vk::PresentModeKHR::MAILBOX;
-const ALTERNATIVE_PRESENT_MODE: vk::PresentModeKHR = vk::PresentModeKHR::FIFO;
+const DESIRED_PRESENT_MODE: vk::PresentModeKHR = vk::PresentModeKHR::FIFO;
 
 const DESIRED_PRE_TRANSFORM: vk::SurfaceTransformFlagsKHR = vk::SurfaceTransformFlagsKHR::IDENTITY;
 
@@ -84,13 +83,7 @@ impl SurfaceInfoForSwapchain {
                 .unwrap_or(formats[0]);
 
             // present_mode
-            let present_modes =
-                instance.get_physical_device_surface_present_modes(physical_device, surface)?;
-            let present_mode = present_modes
-                .iter()
-                .find(|&&mode| mode == DESIRED_PRESENT_MODE)
-                .copied()
-                .unwrap_or(ALTERNATIVE_PRESENT_MODE);
+            let present_mode = DESIRED_PRESENT_MODE;
 
             // pre_transform
             let pre_transform = if caps.supported_transforms.contains(DESIRED_PRE_TRANSFORM) {
