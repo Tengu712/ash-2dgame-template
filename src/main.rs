@@ -1,5 +1,11 @@
 use ash::{prelude::VkResult, vk};
-use std::{ffi::CStr, rc::Rc};
+use std::{
+    ffi::CStr,
+    hint,
+    rc::Rc,
+    thread,
+    time::{Duration, Instant},
+};
 
 mod game;
 mod graphics;
@@ -25,6 +31,9 @@ fn main() {
     const APPLICATION_VERSION: u32 = vk::make_api_version(0, 0, 1, 0);
 
     const MAX_INSTANCE_COUNT: usize = 32;
+
+    const TARGET_FRAME_TIME: Duration = Duration::from_nanos(1_000_000_000 / 60); // 60FPS
+    const SPIN_THRESHOLD: Duration = Duration::from_millis(2);
 
     // ウィンドウ作成
     let window = Window::new(WINDOW_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -54,6 +63,7 @@ fn main() {
     world.load_scene(Scene::Title);
 
     // メインループ
+    let mut frame_start = Instant::now();
     while window.process_events() {
         // 入力状態更新
         input_states.update(&window);
@@ -133,6 +143,19 @@ fn main() {
             }
             Err(e) => panic_log(&format!("unrecoverable error occurred: {e}")),
         }
+
+        // フレームレート制限
+        let frame_time = frame_start.elapsed();
+        if frame_time < TARGET_FRAME_TIME {
+            let remaining = TARGET_FRAME_TIME - frame_time;
+            if remaining > SPIN_THRESHOLD {
+                thread::sleep(remaining - SPIN_THRESHOLD);
+            }
+            while frame_start.elapsed() < TARGET_FRAME_TIME {
+                hint::spin_loop();
+            }
+        }
+        frame_start = Instant::now();
     }
 
     let _ = ctx.wait_idle();
