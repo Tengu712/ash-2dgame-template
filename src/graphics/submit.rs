@@ -4,7 +4,6 @@ use ash::{Device, prelude::VkResult, vk};
 use std::{marker::PhantomData, rc::Rc};
 
 pub mod recording;
-pub mod submitted;
 
 use recording::RecordingCommandBuffer;
 
@@ -16,6 +15,7 @@ pub struct Submitter {
     command_pool: vk::CommandPool,
     command_buffer: vk::CommandBuffer,
     fence: vk::Fence,
+    running: bool,
     _not_send_sync: PhantomData<*const ()>,
 }
 
@@ -29,16 +29,39 @@ impl Submitter {
             command_pool,
             command_buffer,
             fence,
+            running: false,
             _not_send_sync: PhantomData,
         }
     }
 
+    /// コマンド記録を開始する関数
+    ///
+    /// 前回コマンドを提出した後、`wait()`を呼び出さなかった場合、
+    /// 本関数の最初に`wait()`が呼び出される。
     pub fn prepare<'a>(&'a mut self) -> VkResult<RecordingCommandBuffer<'a>> {
         unsafe {
+            self.wait()?;
             self.ctx
                 .device
                 .reset_command_pool(self.command_pool, vk::CommandPoolResetFlags::empty())?;
             RecordingCommandBuffer::new(self)
+        }
+    }
+
+    /// 前回提出されたコマンドの実行完了を待機する関数
+    ///
+    /// コマンドが提出されていない場合、スキップされる。
+    #[allow(dead_code)]
+    pub fn wait(&mut self) -> VkResult<()> {
+        unsafe {
+            if self.running {
+                self.running = false;
+                self.ctx
+                    .device
+                    .wait_for_fences(&[self.fence], true, u64::MAX)
+            } else {
+                Ok(())
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-use super::{Submitter, submitted::SubmittedCommandBuffer};
+use super::Submitter;
 use ash::{prelude::VkResult, vk};
 use std::slice;
 
@@ -38,7 +38,7 @@ impl<'a> RecordingCommandBuffer<'a> {
         self,
         wait_infos: &[(vk::Semaphore, vk::PipelineStageFlags)],
         signal_semaphores: &[vk::Semaphore],
-    ) -> VkResult<SubmittedCommandBuffer<'a>> {
+    ) -> VkResult<()> {
         unsafe {
             self.0
                 .ctx
@@ -59,7 +59,8 @@ impl<'a> RecordingCommandBuffer<'a> {
                 .device
                 .queue_submit(self.0.ctx.queue, &[si], self.0.fence)?;
 
-            Ok(SubmittedCommandBuffer::new(self.0))
+            self.0.running = true;
+            Ok(())
         }
     }
 }

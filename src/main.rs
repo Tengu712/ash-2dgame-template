@@ -72,6 +72,18 @@ fn main() {
                 return Err(vk::Result::ERROR_OUT_OF_DATE_KHR);
             }
 
+            // 準備
+            let semaphores = render_pass.semaphores();
+            let index = swapchain.acquire_next_image_index(semaphores.started_semaphore)?;
+            let framebuffer = &framebuffers[index as usize];
+            let area = vk::Rect2D {
+                offset: vk::Offset2D::default(),
+                extent: swapchain.resolution,
+            };
+
+            // 前回提出したコマンドの実行完了を待機
+            submitter.wait()?;
+
             // ディスクリプタ更新
             let (instances, camera) = world.collect_render_infos(MAX_INSTANCE_COUNT);
             if !instances.is_empty() {
@@ -81,15 +93,6 @@ fn main() {
                     .copy_to_memory(&instances, 0)?;
             }
             descriptors.trans.camera_buffer.copy_to_memory(&camera)?;
-
-            // 準備
-            let semaphores = render_pass.semaphores();
-            let index = swapchain.acquire_next_image_index(semaphores.started_semaphore)?;
-            let framebuffer = &framebuffers[index as usize];
-            let area = vk::Rect2D {
-                offset: vk::Offset2D::default(),
-                extent: swapchain.resolution,
-            };
 
             // 記録&提出
             let command_buffer = submitter.prepare()?;
