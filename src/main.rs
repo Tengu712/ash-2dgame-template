@@ -32,9 +32,6 @@ fn main() {
 
     const MAX_INSTANCE_COUNT: usize = 32;
 
-    // ロガー初期化
-    logs::setup_logger();
-
     // ウィンドウ作成
     let window = Window::new(WINDOW_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT);
     let window = Rc::new(window);

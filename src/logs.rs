@@ -1,6 +1,10 @@
 use crate::window::Window;
-use fern::Dispatch;
-use std::{fmt::Display, time::SystemTime};
+use std::{
+    fmt::Display,
+    fs::OpenOptions,
+    io::Write,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 pub trait LoggableResult<T, E> {
     fn expect_log(self, message: &str) -> T;
@@ -29,22 +33,22 @@ impl<T> LoggableOption<T> for Option<T> {
 }
 
 pub fn panic_log(message: &str) -> ! {
-    log::error!("{message}");
+    let _ = append_log(message);
     Window::show_error_dialog(message);
     panic!("{message}");
 }
 
-pub fn setup_logger() {
-    Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "[{} {}] {}",
-                humantime::format_rfc3339(SystemTime::now()),
-                record.level(),
-                message
-            ))
-        })
-        .chain(fern::log_file("log.txt").expect_log("failed to chain log.txt"))
-        .apply()
-        .expect_log("failed to initialize logger");
+fn append_log(message: &str) -> Result<(), ()> {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("log.txt")
+        .map_err(|_| ())?;
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| ())?
+        .as_secs()
+        .to_string();
+    writeln!(file, "[{timestamp} ERROR] {message}").map_err(|_| ())?;
+    Ok(())
 }
