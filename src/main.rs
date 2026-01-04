@@ -49,7 +49,7 @@ fn main() {
         Rc::clone(&ctx),
         swapchain.image_views.len(),
         swapchain.format.format,
-        &descriptors.collect_set_layouts(),
+        &descriptors,
     )
     .expect_log("failed to create a render pass");
     let mut framebuffers = Framebuffer::from_swapchain(&ctx, render_pass.render_pass, &swapchain)

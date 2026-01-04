@@ -1,6 +1,6 @@
-use super::{context::Context, framebuffer::Framebuffer};
+use super::{context::Context, descriptor::Descriptors, framebuffer::Framebuffer};
 use ash::{Device, prelude::VkResult, vk};
-use std::rc::Rc;
+use std::{marker::PhantomData, rc::Rc};
 
 pub mod pipeline;
 
@@ -18,7 +18,7 @@ pub struct Semaphores {
     pub finished_semaphore: vk::Semaphore,
 }
 
-pub struct RenderPass {
+pub struct RenderPass<'a> {
     pub render_pass: vk::RenderPass,
     pub pipeline: Pipeline,
 
@@ -29,9 +29,11 @@ pub struct RenderPass {
     semaphores: Vec<Semaphores>,
 
     ctx: Rc<Context>,
+
+    _descriptor: PhantomData<&'a ()>,
 }
 
-impl RenderPass {
+impl<'a> RenderPass<'a> {
     /// コンストラクタ
     ///
     /// * ctx - コンテキスト
@@ -41,10 +43,14 @@ impl RenderPass {
         ctx: Rc<Context>,
         image_count: usize,
         format: vk::Format,
-        set_layouts: &[vk::DescriptorSetLayout],
+        descriptors: &'a Descriptors,
     ) -> VkResult<Self> {
         let render_pass = create_render_pass(&ctx.device, format)?;
-        let pipeline = Pipeline::new(Rc::clone(&ctx), render_pass, set_layouts)?;
+        let pipeline = Pipeline::new(
+            Rc::clone(&ctx),
+            render_pass,
+            &descriptors.collect_set_layouts(),
+        )?;
         let mut semaphores = Vec::with_capacity(image_count);
         for _ in 0..image_count {
             semaphores.push(Semaphores {
@@ -58,6 +64,7 @@ impl RenderPass {
             semaphores,
             semaphores_counter: 0,
             ctx,
+            _descriptor: PhantomData,
         })
     }
 
@@ -122,7 +129,7 @@ impl RenderPass {
     }
 }
 
-impl Drop for RenderPass {
+impl Drop for RenderPass<'_> {
     fn drop(&mut self) {
         unsafe {
             for semaphore in self.semaphores.iter() {
