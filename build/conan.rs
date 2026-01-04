@@ -1,4 +1,3 @@
-use super::{is_command_available, run};
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -25,6 +24,8 @@ const CONAN_INSTALL_COMMANDS: &[&str] = &[
 ///
 /// deps/.stampが存在する場合はスキップする。
 pub fn install_dependencies() {
+    use super::{is_command_available, run};
+
     let path = Path::new("deps/.stamp");
     if path.exists() {
         return;

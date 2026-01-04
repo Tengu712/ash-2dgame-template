@@ -1,4 +1,3 @@
-use super::run;
 use std::{env, path::Path};
 
 /// ウィンドウライブラリをビルドする関数
@@ -6,7 +5,7 @@ use std::{env, path::Path};
 /// 既にライブラリファイルが存在する場合はスキップする。
 pub fn build_window_library() {
     if !Path::new("deps/window.lib").exists() {
-        run("window\\windows\\build.bat", &[]);
+        super::run("window\\windows\\build.bat", &[]);
     }
 
     println!("cargo:rerun-if-changed=window/windows/build.bat");
