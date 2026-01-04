@@ -2,11 +2,13 @@ use ash::{prelude::VkResult, vk};
 use glam::{Mat4, Vec3, Vec4};
 use std::{ffi::CStr, rc::Rc};
 
+mod game;
 mod graphics;
 mod input;
 mod logs;
 mod window;
 
+use game::World;
 use graphics::{
     context::Context,
     descriptor::{
@@ -55,6 +57,9 @@ fn main() {
     let mut framebuffers = Framebuffer::from_swapchain(&ctx, render_pass.render_pass, &swapchain)
         .expect_log("failed to create framebuffers");
 
+    // ゲームオブジェクト作成
+    let mut world = World::new();
+
     // DEBUG:
     let instance = Instance {
         transform: Mat4::from_scale(Vec3::new(640.0, 480.0, 1.0)),
@@ -86,6 +91,9 @@ fn main() {
     while window.process_events() {
         // 入力状態更新
         input_states.update(&window);
+
+        // ゲーム更新
+        world.run(&input_states);
 
         // 描画
         let result = toggle_fullscreen_if_needed(&window, &input_states, &ctx);
