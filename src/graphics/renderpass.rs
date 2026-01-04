@@ -82,6 +82,7 @@ impl<'a> RenderPass<'a> {
         command_buffer: vk::CommandBuffer,
         framebuffer: &Framebuffer,
         area: vk::Rect2D,
+        count: usize,
     ) -> VkResult<()> {
         unsafe {
             // レンダーパス開始
@@ -118,8 +119,9 @@ impl<'a> RenderPass<'a> {
                 .device
                 .cmd_set_scissor(command_buffer, 0, &scissors);
 
-            // DEBUG:
-            self.ctx.device.cmd_draw(command_buffer, 4, 1, 0, 0);
+            self.ctx
+                .device
+                .cmd_draw(command_buffer, 4, count as u32, 0, 0);
 
             // レンダーパス終了
             self.ctx.device.cmd_end_render_pass(command_buffer);

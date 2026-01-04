@@ -1,5 +1,4 @@
 use ash::{prelude::VkResult, vk};
-use glam::{Mat4, Vec3, Vec4};
 use std::{ffi::CStr, rc::Rc};
 
 mod game;
@@ -10,15 +9,8 @@ mod window;
 
 use game::World;
 use graphics::{
-    context::Context,
-    descriptor::{
-        Descriptors,
-        transform::{Camera, Instance},
-    },
-    framebuffer::Framebuffer,
-    renderpass::RenderPass,
-    submit::Submitter,
-    swapchain::Swapchain,
+    context::Context, descriptor::Descriptors, framebuffer::Framebuffer, renderpass::RenderPass,
+    submit::Submitter, swapchain::Swapchain,
 };
 use input::{InputStates, Key};
 use logs::*;
@@ -60,33 +52,6 @@ fn main() {
     // ゲームオブジェクト作成
     let mut world = World::new();
 
-    // DEBUG:
-    let instance = Instance {
-        transform: Mat4::from_scale(Vec3::new(640.0, 480.0, 1.0)),
-        color: Vec4::new(1.0, 0.0, 0.0, 1.0),
-    };
-    let camera = Camera {
-        proj: Mat4::orthographic_rh(
-            0.0,
-            SCREEN_WIDTH as f32,
-            0.0,
-            SCREEN_HEIGHT as f32,
-            0.0,
-            100.0,
-        ),
-        view: Mat4::IDENTITY,
-    };
-    descriptors
-        .trans
-        .insts_buffer
-        .copy_to_memory(&[instance], 0)
-        .expect_log("failed to upload a instance");
-    descriptors
-        .trans
-        .camera_buffer
-        .copy_to_memory(&camera)
-        .expect_log("failed to upload a camera");
-
     // メインループ
     while window.process_events() {
         // 入力状態更新
@@ -97,13 +62,15 @@ fn main() {
 
         // 描画
         let result = toggle_fullscreen_if_needed(&window, &input_states, &ctx);
-        let result = result.and_then(|_| {
+        let result = result.and_then(|_| update_descriptors(&world, &descriptors));
+        let result = result.and_then(|count| {
             render_frame(
                 &mut submitter,
                 &swapchain,
                 &mut render_pass,
                 &framebuffers,
                 &descriptors,
+                count,
             )
         });
         match result {
@@ -138,12 +105,25 @@ fn toggle_fullscreen_if_needed(
     }
 }
 
+fn update_descriptors(world: &World, descriptors: &Descriptors) -> VkResult<usize> {
+    let (instances, camera) = world.collect_render_infos();
+    if !instances.is_empty() {
+        descriptors
+            .trans
+            .insts_buffer
+            .copy_to_memory(&instances, 0)?;
+    }
+    descriptors.trans.camera_buffer.copy_to_memory(&camera)?;
+    Ok(instances.len())
+}
+
 fn render_frame<'a>(
     submitter: &mut Submitter,
     swapchain: &'a Swapchain,
     render_pass: &mut RenderPass,
     framebuffers: &[Framebuffer<'a>],
     descriptors: &Descriptors,
+    count: usize,
 ) -> VkResult<()> {
     // 準備
     let semaphores = render_pass.semaphores();
@@ -157,7 +137,12 @@ fn render_frame<'a>(
     // 記録&提出
     let command_buffer = submitter.prepare()?;
     descriptors.record_bind_command(command_buffer.command_buffer(), render_pass.pipeline.layout);
-    render_pass.record_render_commands(command_buffer.command_buffer(), framebuffer, area)?;
+    render_pass.record_render_commands(
+        command_buffer.command_buffer(),
+        framebuffer,
+        area,
+        count,
+    )?;
     command_buffer.submit(
         &[(
             semaphores.started_semaphore,
