@@ -62,22 +62,64 @@ fn main() {
         world.run(&input_states);
 
         // 描画
-        let result = toggle_fullscreen_if_needed(&window, &input_states, &ctx);
-        let result =
-            result.and_then(|_| update_descriptors(&world, &descriptors, MAX_INSTANCE_COUNT));
-        let result = result.and_then(|count| {
-            render_frame(
-                &mut submitter,
-                &swapchain,
-                &mut render_pass,
-                &framebuffers,
-                &descriptors,
-                count,
-            )
-        });
+        //
+        // NOTE: エラーをキャプチャするためにクロージャで実行。
+        let result = || -> VkResult<()> {
+            // フルスクリーン/ウィンドウ切替え確認
+            if input_states.get(Key::Menu) > 0 && input_states.get(Key::Return) == 1 {
+                ctx.wait_idle()?;
+                window.toggle_fullscreen();
+                return Err(vk::Result::ERROR_OUT_OF_DATE_KHR);
+            }
+
+            // ディスクリプタ更新
+            let (instances, camera) = world.collect_render_infos(MAX_INSTANCE_COUNT);
+            if !instances.is_empty() {
+                descriptors
+                    .trans
+                    .insts_buffer
+                    .copy_to_memory(&instances, 0)?;
+            }
+            descriptors.trans.camera_buffer.copy_to_memory(&camera)?;
+
+            // 準備
+            let semaphores = render_pass.semaphores();
+            let index = swapchain.acquire_next_image_index(semaphores.started_semaphore)?;
+            let framebuffer = &framebuffers[index as usize];
+            let area = vk::Rect2D {
+                offset: vk::Offset2D::default(),
+                extent: swapchain.resolution,
+            };
+
+            // 記録&提出
+            let command_buffer = submitter.prepare()?;
+            descriptors
+                .record_bind_command(command_buffer.command_buffer(), render_pass.pipeline.layout);
+            render_pass.record_render_commands(
+                command_buffer.command_buffer(),
+                framebuffer,
+                area,
+                instances.len(),
+            )?;
+            command_buffer.submit(
+                &[(
+                    semaphores.started_semaphore,
+                    vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                )],
+                &[semaphores.finished_semaphore],
+            )?;
+
+            // プレゼンテーション
+            swapchain.queue_presentation_command(index, semaphores.finished_semaphore)?;
+
+            Ok(())
+        }();
+
+        // エラーキャプチャ
         match result {
             Ok(()) => (),
             Err(vk::Result::ERROR_OUT_OF_DATE_KHR) | Err(vk::Result::SUBOPTIMAL_KHR) => {
+                // スワップチェーン再作成
                 drop(framebuffers);
                 swapchain = swapchain
                     .recreate()
@@ -91,74 +133,4 @@ fn main() {
     }
 
     let _ = ctx.wait_idle();
-}
-
-fn toggle_fullscreen_if_needed(
-    window: &Window,
-    input_states: &InputStates,
-    ctx: &Context,
-) -> VkResult<()> {
-    if input_states.get(Key::Menu) > 0 && input_states.get(Key::Return) == 1 {
-        ctx.wait_idle()?;
-        window.toggle_fullscreen();
-        Err(vk::Result::ERROR_OUT_OF_DATE_KHR)
-    } else {
-        Ok(())
-    }
-}
-
-fn update_descriptors(
-    world: &World,
-    descriptors: &Descriptors,
-    max_instance_count: usize,
-) -> VkResult<usize> {
-    let (instances, camera) = world.collect_render_infos(max_instance_count);
-    if !instances.is_empty() {
-        descriptors
-            .trans
-            .insts_buffer
-            .copy_to_memory(&instances, 0)?;
-    }
-    descriptors.trans.camera_buffer.copy_to_memory(&camera)?;
-    Ok(instances.len())
-}
-
-fn render_frame<'a>(
-    submitter: &mut Submitter,
-    swapchain: &'a Swapchain,
-    render_pass: &mut RenderPass,
-    framebuffers: &[Framebuffer<'a>],
-    descriptors: &Descriptors,
-    count: usize,
-) -> VkResult<()> {
-    // 準備
-    let semaphores = render_pass.semaphores();
-    let index = swapchain.acquire_next_image_index(semaphores.started_semaphore)?;
-    let framebuffer = &framebuffers[index as usize];
-    let area = vk::Rect2D {
-        offset: vk::Offset2D::default(),
-        extent: swapchain.resolution,
-    };
-
-    // 記録&提出
-    let command_buffer = submitter.prepare()?;
-    descriptors.record_bind_command(command_buffer.command_buffer(), render_pass.pipeline.layout);
-    render_pass.record_render_commands(
-        command_buffer.command_buffer(),
-        framebuffer,
-        area,
-        count,
-    )?;
-    command_buffer.submit(
-        &[(
-            semaphores.started_semaphore,
-            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-        )],
-        &[semaphores.finished_semaphore],
-    )?;
-
-    // プレゼンテーション
-    swapchain.queue_presentation_command(index, semaphores.finished_semaphore)?;
-
-    Ok(())
 }
