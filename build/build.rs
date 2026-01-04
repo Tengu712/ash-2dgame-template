@@ -1,6 +1,18 @@
+//! ビルドスクリプト
+//!
+//! 概ねビルド時に実行される。
+//! 次を行う:
+//! - Conan2による次の依存パッケージのインストール
+//!   - Vulkan-Loader
+//!   - Vulkan-ValidationLayers (デバッグビルド時)
+//!   - glslang
+//! - Vulkan loaderとのリンク
+//! - Vulkan Validation Layers追加のための実行時環境変数追加
+//! - シェーダファイルのコンパイル
+//! - ウィンドウライブラリのビルドおよびリンク
+
 use std::{
-    env, fs,
-    path::Path,
+    env,
     process::{Command, Stdio},
 };
 
@@ -30,37 +42,17 @@ fn run(command: &str, args: &[&str]) {
     assert!(status.success());
 }
 
-fn generate_cargo_config() {
-    if env::var("PROFILE").unwrap() != "debug" {
-        let _ = fs::remove_file(".cargo/config.toml");
-        return;
-    }
-
-    let deps_path = Path::new(&env::current_dir().unwrap()).join("deps");
-    let cargo_config = format!(
-        r#"[env]
-VK_LAYER_PATH = {{ value = "{0}", force = true }}
-DYLD_LIBRARY_PATH = {{ value = "{0}", force = true }}
-"#,
-        deps_path.display().to_string().replace('\\', "/"),
-    );
-
-    fs::create_dir_all(".cargo").unwrap();
-    fs::write(".cargo/config.toml", cargo_config).unwrap();
-}
-
 fn main() {
     conan::install_dependencies();
-    conan::print_link_info();
+    conan::generate_cargo_config();
+    conan::add_vulkan_lib_dirpath_to_libpath();
 
-    let config = conan::parse_config();
-
-    shader::compile_shader(config.get("GLSLANG_BIN").unwrap());
+    shader::compile_shaders(&conan::get_glslang_bin_dirpath());
 
     #[cfg(target_os = "windows")]
     {
         windows::build_window_library();
-        windows::print_link_info();
+        windows::link_window_library();
     }
     #[cfg(target_os = "macos")]
     {
@@ -68,8 +60,6 @@ fn main() {
         macos::copy_vulkan_dylib(config.get("VULKAN_LIB").unwrap());
         macos::print_link_info();
     }
-
-    generate_cargo_config();
 
     println!("cargo:rerun-if-changed=build.rs");
 }

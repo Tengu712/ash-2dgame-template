@@ -1,4 +1,4 @@
-pub fn compile_shader(glslang_bin_path: &str) {
+pub fn compile_shaders(glslang_bin_path: &str) {
     compile_a_shader(glslang_bin_path, "shader/basic.frag");
     compile_a_shader(glslang_bin_path, "shader/basic.vert");
 }
