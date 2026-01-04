@@ -30,7 +30,7 @@ impl World {
         Self {
             next_entity: 0,
             components: ComponentStorages::default(),
-            systems: system::create_systems(),
+            systems: Vec::new(),
             setup_systems: system::create_setup_systems(),
         }
     }
@@ -52,10 +52,13 @@ impl World {
     pub fn collect_render_infos(&self, max_instance_count: usize) -> (Vec<Instance>, Camera) {
         // TODO:
         let mut instances = Vec::with_capacity(max_instance_count);
-        for (_, pos) in self.components.positions.0.iter() {
+        for (k, pos) in self.components.positions.0.iter() {
+            let Some(scl) = self.components.scales.0.get(k) else {
+                continue;
+            };
             instances.push(Instance {
                 transform: Mat4::from_translation(Vec3::new(pos.x, pos.y, 0.0))
-                    * Mat4::from_scale(Vec3::new(640.0, 480.0, 1.0)),
+                    * Mat4::from_scale(Vec3::new(scl.x, scl.y, 1.0)),
                 color: Vec4::new(1.0, 0.0, 0.0, 1.0),
             });
         }
@@ -74,5 +77,11 @@ impl World {
 
     fn destroy(&mut self, entity: Entity) {
         self.components.destroy_entity(entity);
+    }
+
+    fn clear(&mut self) {
+        self.next_entity = 0;
+        self.components.clear();
+        self.systems.clear();
     }
 }

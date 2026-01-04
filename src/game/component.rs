@@ -25,6 +25,10 @@ macro_rules! define_components {
             pub fn destroy_entity(&mut self, entity: Entity) {
                 $(self.$cname.0.remove(&entity);)*
             }
+
+            pub fn clear(&mut self) {
+                $(self.$cname.0.clear();)*
+            }
         }
     };
 }
@@ -33,4 +37,8 @@ define_components! {
     Position { x: f32, y: f32 } collected positions;
 
     Velocity { r: f32, t: f32 } collected velocities;
+
+    Scale { x: f32, y: f32 } collected scales;
+
+    Player {} collected players;
 }
