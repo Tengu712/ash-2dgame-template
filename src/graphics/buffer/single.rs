@@ -3,7 +3,6 @@ use ash::{prelude::VkResult, vk};
 use std::{marker::PhantomData, mem, ptr, rc::Rc};
 
 pub struct Buffer<T> {
-    pub size: vk::DeviceSize,
     pub buffer: vk::Buffer,
     pub memory: vk::DeviceMemory,
     ctx: Rc<Context>,
@@ -18,7 +17,6 @@ impl<T> Buffer<T> {
         let memory = super::allocate_memory(&ctx, buffer)?;
         unsafe { ctx.device.bind_buffer_memory(buffer, memory, 0)? };
         Ok(Self {
-            size,
             buffer,
             memory,
             ctx,
