@@ -3,20 +3,26 @@ use crate::{
     input::InputStates,
 };
 use glam::{Mat4, Vec3, Vec4};
-use std::mem;
+use std::{collections::HashMap, mem};
 
 mod component;
 mod system;
 
 use component::ComponentStorages;
-use system::System;
+use system::{SetupSystem, System};
 
 type Entity = usize;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Scene {
+    Title,
+}
 
 pub struct World {
     next_entity: Entity,
     components: ComponentStorages,
     systems: Vec<System>,
+    setup_systems: HashMap<Scene, SetupSystem>,
 }
 
 impl World {
@@ -25,6 +31,13 @@ impl World {
             next_entity: 0,
             components: ComponentStorages::default(),
             systems: system::create_systems(),
+            setup_systems: system::create_setup_systems(),
+        }
+    }
+
+    pub fn load_scene(&mut self, scene: Scene) {
+        if let Some(setup_system) = self.setup_systems.get(&scene) {
+            setup_system(self);
         }
     }
 
@@ -36,18 +49,16 @@ impl World {
         self.systems = systems;
     }
 
-    pub fn collect_render_infos(&self) -> (Vec<Instance>, Camera) {
+    pub fn collect_render_infos(&self, max_instance_count: usize) -> (Vec<Instance>, Camera) {
         // TODO:
-        let instances = self
-            .components
-            .positions
-            .0
-            .values()
-            .map(|pos| Instance {
-                transform: Mat4::from_scale(Vec3::new(640.0, 480.0, 1.0)),
+        let mut instances = Vec::with_capacity(max_instance_count);
+        for (_, pos) in self.components.positions.0.iter() {
+            instances.push(Instance {
+                transform: Mat4::from_translation(Vec3::new(pos.x, pos.y, 0.0))
+                    * Mat4::from_scale(Vec3::new(640.0, 480.0, 1.0)),
                 color: Vec4::new(1.0, 0.0, 0.0, 1.0),
-            })
-            .collect();
+            });
+        }
         let camera = Camera {
             view: Mat4::IDENTITY,
             proj: Mat4::orthographic_rh(0.0, 640.0, 0.0, 480.0, 0.0, 100.0),

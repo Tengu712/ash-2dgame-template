@@ -7,7 +7,7 @@ mod input;
 mod logs;
 mod window;
 
-use game::World;
+use game::{Scene, World};
 use graphics::{
     context::Context, descriptor::Descriptors, framebuffer::Framebuffer, renderpass::RenderPass,
     submit::Submitter, swapchain::Swapchain,
@@ -51,6 +51,7 @@ fn main() {
 
     // ゲームオブジェクト作成
     let mut world = World::new();
+    world.load_scene(Scene::Title);
 
     // メインループ
     while window.process_events() {
@@ -62,7 +63,8 @@ fn main() {
 
         // 描画
         let result = toggle_fullscreen_if_needed(&window, &input_states, &ctx);
-        let result = result.and_then(|_| update_descriptors(&world, &descriptors));
+        let result =
+            result.and_then(|_| update_descriptors(&world, &descriptors, MAX_INSTANCE_COUNT));
         let result = result.and_then(|count| {
             render_frame(
                 &mut submitter,
@@ -105,8 +107,12 @@ fn toggle_fullscreen_if_needed(
     }
 }
 
-fn update_descriptors(world: &World, descriptors: &Descriptors) -> VkResult<usize> {
-    let (instances, camera) = world.collect_render_infos();
+fn update_descriptors(
+    world: &World,
+    descriptors: &Descriptors,
+    max_instance_count: usize,
+) -> VkResult<usize> {
+    let (instances, camera) = world.collect_render_infos(max_instance_count);
     if !instances.is_empty() {
         descriptors
             .trans

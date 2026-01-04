@@ -32,5 +32,5 @@ macro_rules! define_components {
 define_components! {
     Position { x: f32, y: f32 } collected positions;
 
-    Velocity { dx: f32, dy: f32 } collected velocities;
+    Velocity { r: f32, t: f32 } collected velocities;
 }
