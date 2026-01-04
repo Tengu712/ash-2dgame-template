@@ -15,7 +15,12 @@ macro_rules! define_iterable_enum {
     };
 }
 
-define_iterable_enum!(Key { Return, Menu });
+define_iterable_enum!(Key {
+    Left,
+    Right,
+    Return,
+    Menu
+});
 
 #[derive(Debug, Default)]
 pub struct InputStates(pub HashMap<Key, usize>);
@@ -40,6 +45,8 @@ impl InputStates {
 impl Key {
     fn to_code(self) -> u32 {
         match self {
+            Self::Left => 0x25,
+            Self::Right => 0x27,
             Self::Return => 0x0D,
             Self::Menu => 0x12,
         }

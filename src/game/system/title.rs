@@ -11,7 +11,7 @@ pub fn setup(world: &mut World) {
         .components
         .positions
         .0
-        .insert(entity, Position { x: 0.0, y: 0.0 });
+        .insert(entity, Position { x: 320.0, y: 400.0 });
     world
         .components
         .velocities
