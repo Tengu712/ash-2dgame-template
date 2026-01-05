@@ -139,6 +139,50 @@ impl Swapchain {
     }
 }
 
+impl Swapchain {
+    /// アスペクト比の正しいビューポートを計算する関数
+    ///
+    /// * ratio - アスペクト比 (幅/高さ)
+    ///
+    /// このビューポートによりNDCがアスペクト比を保って画面中央にマッピングされる。
+    pub fn calc_aspect_corrected_viewport(&self, ratio: f32) -> vk::Viewport {
+        let swapchain_ratio = self.resolution.width as f32 / self.resolution.height as f32;
+        if swapchain_ratio > ratio {
+            let h = self.resolution.height as f32;
+            let w = h * ratio;
+            let x = (self.resolution.width as f32 - w) / 2.0;
+            vk::Viewport {
+                x,
+                y: 0.0,
+                width: w,
+                height: h,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            }
+        } else {
+            let w = self.resolution.width as f32;
+            let h = w / ratio;
+            let y = (self.resolution.height as f32 - h) / 2.0;
+            vk::Viewport {
+                x: 0.0,
+                y,
+                width: w,
+                height: h,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            }
+        }
+    }
+
+    /// 現在のスワップチェーンイメージ全体の範囲を取得する関数
+    pub fn get_full_rect(&self) -> vk::Rect2D {
+        vk::Rect2D {
+            offset: vk::Offset2D::default(),
+            extent: self.resolution,
+        }
+    }
+}
+
 impl Drop for Swapchain {
     fn drop(&mut self) {
         unsafe {

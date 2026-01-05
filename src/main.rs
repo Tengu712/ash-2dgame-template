@@ -15,8 +15,12 @@ mod window;
 
 use game::{Scene, World};
 use graphics::{
-    context::Context, descriptor::Descriptors, framebuffer::Framebuffer, renderpass::RenderPass,
-    submit::Submitter, swapchain::Swapchain,
+    context::Context,
+    descriptor::Descriptors,
+    framebuffer::Framebuffer,
+    renderpass::{RenderAreas, RenderPass},
+    submit::Submitter,
+    swapchain::Swapchain,
 };
 use input::{InputStates, Key};
 use logs::*;
@@ -26,6 +30,7 @@ fn main() {
     const WINDOW_TITLE: &str = "ash-2dgame-template";
     const SCREEN_WIDTH: u32 = 640;
     const SCREEN_HEIGHT: u32 = 480;
+    const ASPECT_RATIO: f32 = SCREEN_WIDTH as f32 / SCREEN_HEIGHT as f32;
 
     const APPLICATION_NAME: &CStr = c"ash-2dgame-template";
     const APPLICATION_VERSION: u32 = vk::make_api_version(0, 0, 1, 0);
@@ -86,9 +91,11 @@ fn main() {
             let semaphores = render_pass.semaphores();
             let index = swapchain.acquire_next_image_index(semaphores.started_semaphore)?;
             let framebuffer = &framebuffers[index as usize];
-            let area = vk::Rect2D {
-                offset: vk::Offset2D::default(),
-                extent: swapchain.resolution,
+            let render_area = swapchain.get_full_rect();
+            let areas = RenderAreas {
+                render_area,
+                viewport: swapchain.calc_aspect_corrected_viewport(ASPECT_RATIO),
+                scissor: render_area,
             };
 
             // 前回提出したコマンドの実行完了を待機
@@ -111,7 +118,7 @@ fn main() {
             render_pass.record_render_commands(
                 command_buffer.command_buffer(),
                 framebuffer,
-                area,
+                areas,
                 instances.len(),
             )?;
             command_buffer.submit(

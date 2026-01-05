@@ -10,12 +10,25 @@ use pipeline::Pipeline;
 pub struct Semaphores {
     /// スワップチェーンイメージが利用可能になるまで待機するためのセマフォ
     ///
-    /// NOTE: スワップチェーンイメージのインデックス取得時にシグナルセマフォに指定すること
+    /// NOTE: スワップチェーンイメージのインデックス取得時にシグナルセマフォに指定すること。
     pub started_semaphore: vk::Semaphore,
     /// 描画が完了するまで待機するためのセマフォ
     ///
-    /// NOTE: コマンドバッファ提出時にシグナルセマフォに指定すること
+    /// NOTE: コマンドバッファ提出時にシグナルセマフォに指定すること。
     pub finished_semaphore: vk::Semaphore,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct RenderAreas {
+    /// クリアの対象となる範囲
+    ///
+    /// WARN: `vireport`よりも広いこと。
+    /// NOTE: 取り敢えずレンダーターゲット全体を指定すると良い。
+    pub render_area: vk::Rect2D,
+    /// NDCのマッピング先範囲
+    pub viewport: vk::Viewport,
+    /// 描画結果を残す範囲
+    pub scissor: vk::Rect2D,
 }
 
 pub struct RenderPass<'a> {
@@ -81,7 +94,7 @@ impl<'a> RenderPass<'a> {
         &self,
         command_buffer: vk::CommandBuffer,
         framebuffer: &Framebuffer,
-        area: vk::Rect2D,
+        areas: RenderAreas,
         count: usize,
     ) -> VkResult<()> {
         unsafe {
@@ -89,7 +102,7 @@ impl<'a> RenderPass<'a> {
             let bi = vk::RenderPassBeginInfo::default()
                 .render_pass(self.render_pass)
                 .framebuffer(framebuffer.framebuffer)
-                .render_area(area)
+                .render_area(areas.render_area)
                 .clear_values(&framebuffer.clear_colors);
             self.ctx
                 .device
@@ -103,22 +116,15 @@ impl<'a> RenderPass<'a> {
             );
 
             // ビューポート設定
-            let viewports = [vk::Viewport {
-                x: area.offset.x as f32,
-                y: area.offset.y as f32,
-                width: area.extent.width as f32,
-                height: area.extent.height as f32,
-                min_depth: 0.0,
-                max_depth: 1.0,
-            }];
-            let scissors = [area];
             self.ctx
                 .device
-                .cmd_set_viewport(command_buffer, 0, &viewports);
+                .cmd_set_viewport(command_buffer, 0, &[areas.viewport]);
             self.ctx
                 .device
-                .cmd_set_scissor(command_buffer, 0, &scissors);
+                .cmd_set_scissor(command_buffer, 0, &[areas.scissor]);
 
+            // ドローコール
+            // 2Dゲームなので1ドローコールで済む
             self.ctx
                 .device
                 .cmd_draw(command_buffer, 4, count as u32, 0, 0);
