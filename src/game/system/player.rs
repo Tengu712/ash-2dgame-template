@@ -18,3 +18,12 @@ pub fn update(world: &mut World, inputs: &InputStates) {
         }
     }
 }
+
+pub fn clamp_position(world: &mut World, _: &InputStates) {
+    for k in world.components.players.0.keys() {
+        let Some(p) = world.components.positions.0.get_mut(k) else {
+            continue;
+        };
+        p.x = p.x.clamp(40.0, 640.0 - 40.0);
+    }
+}

@@ -23,5 +23,6 @@ pub fn setup(world: &mut World) {
     // systems
     world.systems.push(player::update);
     world.systems.push(transform::update_position_with_velocity);
+    world.systems.push(player::clamp_position);
     world.systems.push(instance::update_instance);
 }
