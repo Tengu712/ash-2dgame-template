@@ -102,12 +102,12 @@ fn main() {
             submitter.wait()?;
 
             // ディスクリプタ更新
-            let (instances, camera) = world.collect_render_infos(MAX_INSTANCE_COUNT);
+            let (instances, camera) = world.collect_render_infos();
             if !instances.is_empty() {
                 descriptors
                     .trans
                     .insts_buffer
-                    .copy_to_memory(&instances, 0)?;
+                    .copy_to_memory(&instances[..instances.len().min(MAX_INSTANCE_COUNT)], 0)?;
             }
             descriptors.trans.camera_buffer.copy_to_memory(&camera)?;
 

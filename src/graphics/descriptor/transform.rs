@@ -32,12 +32,14 @@ pub(super) const BINDINGS: &[vk::DescriptorSetLayoutBinding] = &[
 ];
 
 #[repr(C, align(16))]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Instance {
     pub transform: Mat4,
     pub color: Vec4,
 }
 
 #[repr(C, align(16))]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Camera {
     pub view: Mat4,
     pub proj: Mat4,

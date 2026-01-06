@@ -9,6 +9,11 @@ pub fn setup(world: &mut World) {
     world.components.players.0.insert(entity, Player {});
     world
         .components
+        .instances
+        .0
+        .insert(entity, InstanceData::default());
+    world
+        .components
         .positions
         .0
         .insert(entity, Position { x: 320.0, y: 400.0 });
@@ -24,6 +29,7 @@ pub fn setup(world: &mut World) {
         .insert(entity, Scale { x: 10.0, y: 10.0 });
 
     // systems
-    world.systems.push(transform::update_position_with_velocity);
     world.systems.push(player::update);
+    world.systems.push(transform::update_position_with_velocity);
+    world.systems.push(instance::update_instance);
 }

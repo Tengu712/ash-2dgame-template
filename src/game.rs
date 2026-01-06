@@ -3,7 +3,7 @@ use crate::{
     input::InputStates,
 };
 use glam::{Mat4, Vec3, Vec4};
-use std::{collections::HashMap, mem};
+use std::{cmp::Ordering, collections::HashMap, mem};
 
 mod component;
 mod system;
@@ -49,19 +49,21 @@ impl World {
         self.systems = systems;
     }
 
-    pub fn collect_render_infos(&self, max_instance_count: usize) -> (Vec<Instance>, Camera) {
-        // TODO:
-        let mut instances = Vec::with_capacity(max_instance_count);
-        for (k, pos) in self.components.positions.0.iter() {
-            let Some(scl) = self.components.scales.0.get(k) else {
-                continue;
-            };
-            instances.push(Instance {
-                transform: Mat4::from_translation(Vec3::new(pos.x, pos.y, 0.0))
-                    * Mat4::from_scale(Vec3::new(scl.x, scl.y, 1.0)),
-                color: Vec4::new(1.0, 0.0, 0.0, 1.0),
-            });
-        }
+    pub fn collect_render_infos(&self) -> (Vec<Instance>, Camera) {
+        let mut instances = self
+            .components
+            .instances
+            .0
+            .values()
+            .map(|n| n.data)
+            .collect::<Vec<_>>();
+        instances.sort_by(|a, b| {
+            a.transform
+                .w_axis
+                .z
+                .partial_cmp(&b.transform.w_axis.z)
+                .unwrap_or(Ordering::Equal)
+        });
         let camera = Camera {
             view: Mat4::IDENTITY,
             proj: Mat4::orthographic_rh(0.0, 640.0, 0.0, 480.0, 0.0, 100.0),
