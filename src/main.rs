@@ -109,7 +109,9 @@ fn main() {
                     .insts_buffer
                     .copy_to_memory(&instances[..instances.len().min(MAX_INSTANCE_COUNT)], 0)?;
             }
-            descriptors.trans.camera_buffer.copy_to_memory(&camera)?;
+            if let Some(camera) = camera {
+                descriptors.trans.camera_buffer.copy_to_memory(&camera)?;
+            }
 
             // 記録&提出
             let command_buffer = submitter.prepare()?;

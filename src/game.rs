@@ -2,7 +2,7 @@ use crate::{
     graphics::descriptor::transform::{Camera, Instance},
     input::InputStates,
 };
-use glam::{Mat4, Vec3, Vec4};
+use glam::Mat4;
 use std::{cmp::Ordering, collections::HashMap, mem};
 
 mod component;
@@ -22,7 +22,11 @@ pub struct World {
     next_entity: Entity,
     components: ComponentStorages,
     systems: Vec<System>,
+
     setup_systems: HashMap<Scene, SetupSystem>,
+
+    camera: Camera,
+    camera_updated: bool,
 }
 
 impl World {
@@ -32,6 +36,11 @@ impl World {
             components: ComponentStorages::default(),
             systems: Vec::new(),
             setup_systems: system::create_setup_systems(),
+            camera: Camera {
+                view: Mat4::IDENTITY,
+                proj: Mat4::orthographic_rh(0.0, 640.0, 0.0, 480.0, 0.0, 100.0),
+            },
+            camera_updated: true,
         }
     }
 
@@ -49,7 +58,7 @@ impl World {
         self.systems = systems;
     }
 
-    pub fn collect_render_infos(&self) -> (Vec<Instance>, Camera) {
+    pub fn collect_render_infos(&mut self) -> (Vec<Instance>, Option<Camera>) {
         let mut instances = self
             .components
             .instances
@@ -64,9 +73,11 @@ impl World {
                 .partial_cmp(&b.transform.w_axis.z)
                 .unwrap_or(Ordering::Equal)
         });
-        let camera = Camera {
-            view: Mat4::IDENTITY,
-            proj: Mat4::orthographic_rh(0.0, 640.0, 0.0, 480.0, 0.0, 100.0),
+        let camera = if self.camera_updated {
+            self.camera_updated = false;
+            Some(self.camera)
+        } else {
+            None
         };
         (instances, camera)
     }
