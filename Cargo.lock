@@ -17,6 +17,7 @@ version = "0.1.0"
 dependencies = [
  "ash",
  "glam",
+ "procmacro",
 ]
 
 [[package]]
@@ -40,6 +41,10 @@ dependencies = [
  "cfg-if",
  "windows-link",
 ]
+
+[[package]]
+name = "procmacro"
+version = "0.1.0"
 
 [[package]]
 name = "windows-link"
