@@ -1,10 +1,7 @@
 use super::*;
 
 pub fn update(world: &mut World, inputs: &InputStates) {
-    for k in world.components.players.0.keys() {
-        let Some(v) = world.components.velocities.0.get_mut(k) else {
-            continue;
-        };
+    for (_, v) in world.components.player_velocity() {
         let l = inputs.get(Key::Left) > 0;
         let r = inputs.get(Key::Right) > 0;
         if l && !r {
@@ -20,10 +17,7 @@ pub fn update(world: &mut World, inputs: &InputStates) {
 }
 
 pub fn clamp_position(world: &mut World, _: &InputStates) {
-    for k in world.components.players.0.keys() {
-        let Some(p) = world.components.positions.0.get_mut(k) else {
-            continue;
-        };
+    for (_, p) in world.components.player_position() {
         p.x = p.x.clamp(40.0, 640.0 - 40.0);
     }
 }

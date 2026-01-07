@@ -44,18 +44,23 @@ macro_rules! define_components {
     };
 }
 
-macro_rules! define_query_methods {
-    ($mname:ident $mcname:ident: &mut $mty:ty, $rname:ident $rcname:ident: $rty:ty) => {
+macro_rules! define_query_method {
+    ($name1:ident $cname1:ident: $sname1:ty, $name2:ident $cname2:ident: $sname2:ty) => {
         impl ComponentStorages {
             cat_ids! {
-                pub fn [|$mname _ $rname|](&mut self) -> impl Iterator<Item = (&mut $mty, &$rty)> + '_ {
-                    let $rcname = &self.$rcname.0;
-                    self.$mcname
-                        .0
-                        .iter_mut()
-                        .filter_map(move |(entity, $mname)| {
-                            $rcname.get(entity).map(|$rname| ($mname, $rname))
-                        })
+                /// クエリメソッド (2要素)
+                ///
+                /// コンポーネントA, Bについて、(&mut A, &mut B)のイテレータを返す。
+                /// A優先でイテレートされる。
+                pub fn [|$name1 _ $name2|](&mut self) -> impl Iterator<Item = (&mut $sname1, &mut $sname2)> + '_ {
+                    let $cname2 = &mut self.$cname2.0 as *mut HashMap<Entity, $sname2>;
+                    self.$cname1.0.iter_mut().filter_map(move |(entity, $name1)| {
+                        // SAFETY: 各Entityは一意であり、
+                        //         異なるEntityのPositionとVelocityへの可変参照は重複しない。
+                        unsafe {
+                            (*$cname2).get_mut(entity).map(|$name2| ($name1, $name2))
+                        }
+                    })
                 }
             }
         }
@@ -88,4 +93,6 @@ define_components! {
     Velocity { pub r: f32, pub t: f32 } velocity velocities;
 }
 
-define_query_methods!(position positions: &mut Position, velocity velocities: Velocity);
+define_query_method!(position positions: Position, velocity velocities: Velocity);
+define_query_method!(player players: Player, position positions: Position);
+define_query_method!(player players: Player, velocity velocities: Velocity);
