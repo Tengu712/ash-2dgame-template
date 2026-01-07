@@ -44,6 +44,24 @@ macro_rules! define_components {
     };
 }
 
+macro_rules! define_query_methods {
+    ($mname:ident $mcname:ident: &mut $mty:ty, $rname:ident $rcname:ident: $rty:ty) => {
+        impl ComponentStorages {
+            cat_ids! {
+                pub fn [|$mname _ $rname|](&mut self) -> impl Iterator<Item = (&mut $mty, &$rty)> + '_ {
+                    let $rcname = &self.$rcname.0;
+                    self.$mcname
+                        .0
+                        .iter_mut()
+                        .filter_map(move |(entity, $mname)| {
+                            $rcname.get(entity).map(|$rname| ($mname, $rname))
+                        })
+                }
+            }
+        }
+    };
+}
+
 define_components! {
     Player {} player players;
 
@@ -69,3 +87,5 @@ define_components! {
 
     Velocity { pub r: f32, pub t: f32 } velocity velocities;
 }
+
+define_query_methods!(position positions: &mut Position, velocity velocities: Velocity);
