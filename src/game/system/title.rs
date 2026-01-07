@@ -44,5 +44,6 @@ pub fn setup(world: &mut World) {
     world.systems.push(transform::update_position_with_velocity);
     world.systems.push(player::clamp_position);
     world.systems.push(ball::clamp_and_reflect);
+    world.systems.push(ball::reflect_with_player);
     world.systems.push(instance::update_instance);
 }
