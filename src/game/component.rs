@@ -65,10 +65,34 @@ macro_rules! define_query_method {
             }
         }
     };
+
+    ($name1:ident $cname1:ident: $sname1:ty, $name2:ident $cname2:ident: $sname2:ty, $name3:ident $cname3:ident: $sname3:ty) => {
+        impl ComponentStorages {
+            cat_ids! {
+                /// クエリメソッド (3要素)
+                ///
+                /// コンポーネントA, B, Cについて、(&mut A, &mut B, &mut C)のイテレータを返す。
+                /// A優先でイテレートされる。
+                pub fn [|$name1 _ $name2 _ $name3|](&mut self) -> impl Iterator<Item = (&mut $sname1, &mut $sname2, &mut $sname3)> + '_ {
+                    let $cname2 = &mut self.$cname2.0 as *mut HashMap<Entity, $sname2>;
+                    let $cname3 = &mut self.$cname3.0 as *mut HashMap<Entity, $sname3>;
+                    self.$cname1.0.iter_mut().filter_map(move |(entity, $name1)| {
+                        // SAFETY: 各Entityは一意であり、
+                        //         異なるEntityのPositionとVelocityへの可変参照は重複しない。
+                        unsafe {
+                            (*$cname2).get_mut(entity).map(|$name2| (*$cname3).get_mut(entity).map(|$name3| ($name1, $name2, $name3))).flatten()
+                        }
+                    })
+                }
+            }
+        }
+    };
 }
 
 define_components! {
     Player {} player players;
+
+    Ball {} ball balls;
 
     Position { pub x: f32, pub y: f32 } position positions;
 
@@ -96,3 +120,4 @@ define_components! {
 define_query_method!(position positions: Position, velocity velocities: Velocity);
 define_query_method!(player players: Player, position positions: Position);
 define_query_method!(player players: Player, velocity velocities: Velocity);
+define_query_method!(ball balls: Ball, position positions: Position, velocity velocities: Velocity);
