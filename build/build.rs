@@ -1,40 +1,34 @@
 //! ビルドスクリプト
 //!
-//! 概ねビルド時に実行される。
-//! 次を行う:
-//! - Conan2による次の依存パッケージのインストール
-//!   - Vulkan-Loader
-//!   - Vulkan-ValidationLayers (デバッグビルド時)
-//!   - glslang
+//! - 依存パッケージのインストール
 //! - Vulkan loaderとのリンク
-//! - Vulkan Validation Layers追加のための実行時環境変数追加
+//! - Vulkan Validation Layersの実行時有効化のためのconfig.toml生成
 //! - シェーダファイルのコンパイル
 //! - ウィンドウライブラリのビルドおよびリンク
 
 use std::{
     env,
+    path::Path,
     process::{Command, Stdio},
 };
 
-mod conan;
+mod deps;
 #[cfg(target_os = "macos")]
 mod macos;
 mod shader;
+mod vulkan;
 #[cfg(target_os = "windows")]
 mod windows;
 
-fn is_command_available(command: &str) -> bool {
-    Command::new(command)
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+fn run(command: &str, args: &[&str]) {
+    run_on(&env::current_dir().unwrap(), command, args)
 }
 
-fn run(command: &str, args: &[&str]) {
+fn run_on(dir: &Path, command: &str, args: &[&str]) {
     let status = Command::new(command)
         .args(args)
         .env("CARGO_PROFILE", env::var("PROFILE").unwrap())
+        .current_dir(dir)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
@@ -43,11 +37,13 @@ fn run(command: &str, args: &[&str]) {
 }
 
 fn main() {
-    conan::install_dependencies();
-    conan::generate_cargo_config();
-    conan::add_vulkan_lib_dirpath_to_libpath();
+    deps::install_dependencies();
 
-    shader::compile_shaders(&conan::get_glslang_bin_dirpath());
+    vulkan::add_vulkan_lib_path_to_libpath();
+    #[cfg(all(debug_assertions, feature = "vvl"))]
+    vulkan::generate_config_toml_to_use_vvl();
+
+    shader::compile_shaders();
 
     #[cfg(target_os = "windows")]
     {
@@ -57,8 +53,8 @@ fn main() {
     #[cfg(target_os = "macos")]
     {
         // TODO: build_window_library()
-        macos::copy_vulkan_dylib(config.get("VULKAN_LIB").unwrap());
-        macos::print_link_info();
+        //macos::copy_vulkan_dylib(config.get("VULKAN_LIB").unwrap());
+        //macos::print_link_info();
     }
 
     println!("cargo:rerun-if-changed=build.rs");

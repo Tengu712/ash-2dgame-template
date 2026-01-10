@@ -101,16 +101,15 @@ impl Drop for Context {
 /// - macOSではMoltenVKのための拡張等を有効化する。
 /// - 各OS専用のサーフェス拡張を有効化する。
 fn create_instance(entry: &Entry, app_name: &CStr, app_version: u32) -> Instance {
-    #[cfg(debug_assertions)]
-    let layers = [c"VK_LAYER_KHRONOS_validation".as_ptr()];
-    #[cfg(not(debug_assertions))]
-    let layers = [];
-
-    #[cfg(target_os = "windows")]
-    let extensions = [c"VK_KHR_surface".as_ptr(), c"VK_KHR_win32_surface".as_ptr()];
-    #[cfg(target_os = "macos")]
+    let layers = [
+        #[cfg(all(debug_assertions, feature = "vvl"))]
+        c"VK_LAYER_KHRONOS_validation".as_ptr(),
+    ];
     let extensions = [
         c"VK_KHR_surface".as_ptr(),
+        #[cfg(target_os = "windows")]
+        c"VK_KHR_win32_surface".as_ptr(),
+        #[cfg(target_os = "macos")]
         c"VK_KHR_portability_enumeration".as_ptr(),
     ];
 

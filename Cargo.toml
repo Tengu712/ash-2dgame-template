@@ -6,6 +6,10 @@ license = "CC0-1.0"
 publish = false
 build = "build/build.rs"
 
+[features]
+# Vulkan Validation Layersをdebug時にインストール・有効化するためのfeature
+vvl = []
+
 [dependencies]
 ash = { version = "0.38.0", features = ["std", "linked", "debug"] }
 glam = "0.30"

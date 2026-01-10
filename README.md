@@ -12,20 +12,30 @@ Rustのashを使った2Dゲーム向けのテンプレートコードです。
 
 次を用意してください:
 
+- Git
 - Cargo
-- Conan2あるいはuv
+- Python
+- CMake
 - Ninja
 - MSVC環境 (Windows)
 
 次を実行してください:
 
-```
+```sh
+# Debugビルド
 cargo build
+
+# Releaseビルド
+cargo build --release
 ```
 
 > [!NOTE]
-> デバッグビルド時のみVulkan Validation Layersをインストールします。
-> このインストールにはそこそこの時間がかかります。
+> 依存パッケージのインストールにそれなりの時間がかかります。
+
+> [!NOTE]
+> Vulkan Validation Layersはデバッグ時かつ`vvl` feature有効時のみ利用できます。
+> 1. `cargo build --features vvl`でビルドし、
+> 2. `cargo run --features vvl`で実行してください。
 
 ## Modules
 
