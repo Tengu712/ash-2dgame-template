@@ -16,6 +16,8 @@ type Entity = usize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Scene {
     Title,
+    Play,
+    Result,
 }
 
 pub struct World {
@@ -24,18 +26,20 @@ pub struct World {
     systems: Vec<System>,
 
     setup_systems: HashMap<Scene, SetupSystem>,
+    next_scene: Option<Scene>,
 
     camera: Camera,
     camera_updated: bool,
 }
 
 impl World {
-    pub fn new() -> Self {
+    pub fn new(initial_scene: Scene) -> Self {
         Self {
             next_entity: 0,
             components: ComponentStorages::default(),
             systems: Vec::new(),
             setup_systems: system::create_setup_systems(),
+            next_scene: Some(initial_scene),
             camera: Camera {
                 view: Mat4::IDENTITY,
                 proj: Mat4::orthographic_rh(0.0, 640.0, 0.0, 480.0, 0.0, 100.0),
@@ -44,13 +48,12 @@ impl World {
         }
     }
 
-    pub fn load_scene(&mut self, scene: Scene) {
-        if let Some(setup_system) = self.setup_systems.get(&scene) {
+    pub fn run(&mut self, input_states: &InputStates) {
+        if let Some(next_scene) = self.next_scene.take()
+            && let Some(setup_system) = self.setup_systems.get(&next_scene)
+        {
             setup_system(self);
         }
-    }
-
-    pub fn run(&mut self, input_states: &InputStates) {
         let systems = mem::take(&mut self.systems);
         for system in &systems {
             system(self, input_states);

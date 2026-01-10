@@ -64,8 +64,7 @@ fn main() {
         .expect_log("failed to create framebuffers");
 
     // ゲームオブジェクト作成
-    let mut world = World::new();
-    world.load_scene(Scene::Title);
+    let mut world = World::new(Scene::Title);
 
     // メインループ
     let mut frame_start = Instant::now();
