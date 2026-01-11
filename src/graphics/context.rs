@@ -1,8 +1,8 @@
 use crate::logs::*;
 use ash::{
-    khr::{self, surface, swapchain},
+    khr::{surface, swapchain},
     prelude::VkResult,
-    vk, *,
+    *,
 };
 use std::{ffi::CStr, slice, sync::LazyLock};
 
@@ -33,6 +33,8 @@ pub struct Context {
 
     #[cfg(target_os = "windows")]
     pub win32_surface_loader: khr::win32_surface::Instance,
+    #[cfg(target_os = "macos")]
+    pub metal_surface_loader: ext::metal_surface::Instance,
 }
 
 impl Context {
@@ -48,6 +50,8 @@ impl Context {
 
         #[cfg(target_os = "windows")]
         let win32_surface_loader = khr::win32_surface::Instance::new(&ENTRY, &instance);
+        #[cfg(target_os = "macos")]
+        let metal_surface_loader = ext::metal_surface::Instance::new(&ENTRY, &instance);
 
         Self {
             instance,
@@ -59,6 +63,8 @@ impl Context {
             swapchain_loader,
             #[cfg(target_os = "windows")]
             win32_surface_loader,
+            #[cfg(target_os = "macos")]
+            metal_surface_loader,
         }
     }
 
@@ -105,11 +111,13 @@ fn create_instance(entry: &Entry, app_name: &CStr, app_version: u32) -> Instance
         #[cfg(all(debug_assertions, feature = "vvl"))]
         c"VK_LAYER_KHRONOS_validation".as_ptr(),
     ];
+
+    #[cfg(target_os = "windows")]
+    let extensions = [c"VK_KHR_surface".as_ptr(), c"VK_KHR_win32_surface".as_ptr()];
+    #[cfg(target_os = "macos")]
     let extensions = [
         c"VK_KHR_surface".as_ptr(),
-        #[cfg(target_os = "windows")]
-        c"VK_KHR_win32_surface".as_ptr(),
-        #[cfg(target_os = "macos")]
+        c"VK_EXT_metal_surface".as_ptr(),
         c"VK_KHR_portability_enumeration".as_ptr(),
     ];
 
@@ -181,7 +189,11 @@ fn create_device(
     physical_device: vk::PhysicalDevice,
     queue_family_index: u32,
 ) -> Device {
-    let extensions = [c"VK_KHR_swapchain".as_ptr()];
+    let extensions = [
+        c"VK_KHR_swapchain".as_ptr(),
+        #[cfg(target_os = "macos")]
+        c"VK_KHR_portability_subset".as_ptr(),
+    ];
     let qci = vk::DeviceQueueCreateInfo::default()
         .queue_family_index(queue_family_index)
         .queue_priorities(&[1.0]);

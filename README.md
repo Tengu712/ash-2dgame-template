@@ -18,6 +18,7 @@ Rustのashを使った2Dゲーム向けのテンプレートコードです。
 - CMake
 - Ninja
 - MSVC環境 (Windows)
+- Xcode CLT (macOS)
 
 次を実行してください:
 

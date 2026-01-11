@@ -39,11 +39,14 @@ fn run_on(dir: &Path, command: &str, args: &[&str]) {
 fn main() {
     deps::install_dependencies();
 
+    shader::compile_shaders();
+
     vulkan::add_vulkan_lib_path_to_libpath();
     #[cfg(all(debug_assertions, feature = "vvl"))]
-    vulkan::generate_config_toml_to_use_vvl();
-
-    shader::compile_shaders();
+    {
+        vulkan::copy_vvl_files_to_deps_dir();
+        vulkan::generate_config_toml_to_use_vvl();
+    }
 
     #[cfg(target_os = "windows")]
     {
@@ -52,9 +55,10 @@ fn main() {
     }
     #[cfg(target_os = "macos")]
     {
-        // TODO: build_window_library()
-        //macos::copy_vulkan_dylib(config.get("VULKAN_LIB").unwrap());
-        //macos::print_link_info();
+        macos::build_window_library();
+        macos::link_window_library();
+        macos::copy_vulkan_dylib();
+        macos::set_rpath();
     }
 
     println!("cargo:rerun-if-changed=build.rs");

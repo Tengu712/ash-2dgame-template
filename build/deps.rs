@@ -190,7 +190,7 @@ pub fn get_glslang_path() -> String {
 
 #[cfg(all(debug_assertions, feature = "vvl"))]
 pub fn get_vvl_path() -> String {
-    path_to_string(&VULKAN_VALIDATION_LAYERS.install_path().join("bin"))
+    path_to_string(&VULKAN_VALIDATION_LAYERS.install_path())
 }
 
 fn path_to_string(path: &Path) -> String {

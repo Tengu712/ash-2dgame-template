@@ -52,3 +52,15 @@ impl Key {
         }
     }
 }
+
+#[cfg(target_os = "macos")]
+impl Key {
+    fn to_code(self) -> u16 {
+        match self {
+            Self::Left => 123,
+            Self::Right => 124,
+            Self::Return => 36,
+            Self::Menu => 999,
+        }
+    }
+}

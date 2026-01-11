@@ -1,11 +1,39 @@
+use super::deps;
 use std::{env, fs, path::Path};
 
-const VULKAN_LIB_NAME: &str = "libvulkan.1.3.243.dylib";
-const VULKAN_LIB_NAME_STEM: &str = "vulkan.1.3.243";
-const VULKAN_LIB_INSTALL_NAME: &str = "libvulkan.1.dylib";
+/// ウィンドウライブラリをビルドする関数
+///
+/// 既にライブラリファイルが存在する場合はスキップする。
+///
+/// NOTE: ウィンドウライブラリを更新する場合、deps/libwindow.aを削除してリビルドすること。
+pub fn build_window_library() {
+    if !Path::new("deps/libwindow.a").exists() {
+        super::run("window/macos/build.sh", &[]);
+    }
 
-pub fn copy_vulkan_dylib(vulkan_lib_path: &str) {
-    let src = Path::new(vulkan_lib_path).join(VULKAN_LIB_NAME);
+    println!("cargo:rerun-if-changed=window/macos/build.sh");
+    println!("cargo:rerun-if-changed=window/macos/window.swift");
+}
+
+pub fn link_window_library() {
+    println!(
+        "cargo:rustc-link-search=native={}",
+        env::current_dir().unwrap().join("deps").display()
+    );
+    println!("cargo:rustc-link-lib=window");
+    println!("cargo:rustc-link-lib=framework=Cocoa");
+    println!("cargo:rustc-link-lib=framework=QuartzCore");
+}
+
+/// ビルドディレクトリにlibvulkan.1.dylibをコピーする関数
+///
+/// NOTE: 他OSとは違って普通macOSはVulkanローダを持っていない。
+///       従って、Vulkanローダを同梱する必要がある。
+pub fn copy_vulkan_dylib() {
+    const VULKAN_LIB_NAME: &str = "libvulkan.1.4.335.dylib";
+    const VULKAN_LIB_INSTALL_NAME: &str = "libvulkan.1.dylib";
+
+    let src = Path::new(&deps::get_vulkan_lib_path()).join(VULKAN_LIB_NAME);
     let dst = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap())
         .join("target")
         .join(env::var("PROFILE").unwrap())
@@ -15,8 +43,7 @@ pub fn copy_vulkan_dylib(vulkan_lib_path: &str) {
     }
 }
 
-pub fn print_link_info() {
-    println!("cargo:rustc-link-lib={VULKAN_LIB_NAME_STEM}");
+pub fn set_rpath() {
     println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path");
     println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");
 }

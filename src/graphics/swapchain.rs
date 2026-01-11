@@ -30,6 +30,10 @@ impl Swapchain {
         let surface = window
             .create_surface(&ctx.win32_surface_loader)
             .expect_log("failed to create the surface of the window");
+        #[cfg(target_os = "macos")]
+        let surface = window
+            .create_surface(&ctx.metal_surface_loader)
+            .expect_log("failed to create the surface of the window");
 
         // swapchain
         let window_size = window
