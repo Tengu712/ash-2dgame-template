@@ -2,7 +2,6 @@ use crate::logs::*;
 use ash::{ext::metal_surface::Instance, prelude::VkResult, vk};
 use std::{
     ffi::{CString, c_char, c_void},
-    iter,
     marker::PhantomData,
 };
 
