@@ -7,7 +7,7 @@ pub fn compile_shaders() {
 
 fn compile_a_shader(file_path: &str) {
     super::run(
-        &deps::get_glslang_path(),
+        &deps::get_glslang_path().display().to_string(),
         &["-V", file_path, "-o", &format!("{file_path}.spv")],
     );
     println!("cargo:rerun-if-changed={file_path}");

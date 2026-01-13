@@ -1,63 +1,62 @@
 use super::deps;
-use std::{env, fs, path::Path};
+use std::fs;
 
-/// ウィンドウライブラリをビルドする関数
+/// MoltenVKをダウンロードする関数
 ///
-/// 既にライブラリファイルが存在する場合はスキップする。
-///
-/// NOTE: ウィンドウライブラリを更新する場合、deps/libwindow.aを削除してリビルドすること。
-pub fn build_window_library() {
-    if !Path::new("deps/libwindow.a").exists() {
-        super::run("window/macos/build.sh", &[]);
+/// NOTE: depsモジュールにある依存とは異なり、
+///       自前ビルドするのが相当面倒くさそうな上、
+///       GitHub上で事前ビルドされたバイナリが公開されているため、
+///       それをダウンロードして用いる。
+pub fn download_molten_vk() {
+    const URL: &str =
+        "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.1/MoltenVK-macos.tar";
+    const TAR: &str = "MoltenVK-macos.tar";
+    const DIR: &str = "MoltenVK-macos";
+
+    let deps_path = super::deps_path();
+
+    if !deps_path.join(TAR).exists() {
+        super::run_on(&deps_path, "curl", &["-4", "-o", TAR, "-L", URL]);
     }
-
-    println!("cargo:rerun-if-changed=window/macos/build.sh");
-    println!("cargo:rerun-if-changed=window/macos/window.swift");
+    if !deps_path.join(DIR).exists() {
+        super::run_on(&deps_path, "mkdir", &[DIR]);
+        super::run_on(&deps_path, "tar", &["-xf", TAR, "-C", DIR]);
+    }
 }
 
-pub fn link_window_library() {
-    println!(
-        "cargo:rustc-link-search=native={}",
-        env::current_dir().unwrap().join("deps").display()
-    );
-    println!("cargo:rustc-link-lib=window");
-    println!("cargo:rustc-link-lib=framework=Cocoa");
-    println!("cargo:rustc-link-lib=framework=QuartzCore");
-}
-
-/// ビルドディレクトリにlibvulkan.1.dylibをコピーする関数
+/// ビルドディレクトリにVulkanを利用するために必要なファイル群をコピーする関数
 ///
-/// NOTE: 他OSとは違って普通macOSはVulkanローダを持っていない。
-///       従って、Vulkanローダを同梱する必要がある。
-pub fn copy_vulkan_dylib() {
+/// コピー対象:
+/// - Vulkanローダ
+/// - MoltenVK (ライブラリ)
+/// - MoltenVK (ICD)
+///
+/// NOTE: 他OSとは違ってmacOSはVulkanをサポートしていない。
+///       従って、VulkanローダとMoltenVKを同梱する必要がある。
+pub fn copy_vulkan_files_to_build_path() {
     const VULKAN_LIB_NAME: &str = "libvulkan.1.4.335.dylib";
     const VULKAN_LIB_INSTALL_NAME: &str = "libvulkan.1.dylib";
+    const MOLTEN_VK_DYLIB_NAME: &str = "libMoltenVK.dylib";
+    const MOLTEN_VK_JSON_NAME: &str = "MoltenVK_icd.json";
 
-    let src = Path::new(&deps::get_vulkan_lib_path()).join(VULKAN_LIB_NAME);
-    let dst = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("target")
-        .join(env::var("PROFILE").unwrap())
-        .join(VULKAN_LIB_INSTALL_NAME);
-    if !dst.exists() {
-        fs::copy(src, dst).unwrap();
-    }
-}
+    let vulkan_lib_path = deps::get_vulkan_lib_path();
+    let molten_vk_path = super::deps_path()
+        .join("MoltenVK-macos")
+        .join("MoltenVK")
+        .join("MoltenVK")
+        .join("dynamic")
+        .join("dylib")
+        .join("macOS");
+    let sd_sn_dn = [
+        (&vulkan_lib_path, VULKAN_LIB_NAME, VULKAN_LIB_INSTALL_NAME),
+        (&molten_vk_path, MOLTEN_VK_DYLIB_NAME, MOLTEN_VK_DYLIB_NAME),
+        (&molten_vk_path, MOLTEN_VK_JSON_NAME, MOLTEN_VK_JSON_NAME),
+    ];
 
-pub fn copy_molten_vk() {
-    const DYLIB_NAME: &str = "libMoltenVK.dylib";
-    const JSON_NAME: &str = "MoltenVK_icd.json";
-
-    let src = deps::get_molten_vk_path();
-    let src = Path::new(&src);
-
-    for n in [DYLIB_NAME, JSON_NAME].iter() {
-        let src = src.join(n);
-        let dst = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap())
-            .join("target")
-            .join(env::var("PROFILE").unwrap())
-            .join(n);
+    for (sd, sn, dn) in sd_sn_dn.iter() {
+        let dst = super::build_path().join(dn);
         if !dst.exists() {
-            fs::copy(src, dst).unwrap();
+            fs::copy(sd.join(sn), dst).unwrap();
         }
     }
 }
