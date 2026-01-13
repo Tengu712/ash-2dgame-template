@@ -7,6 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod env;
 mod game;
 mod graphics;
 mod input;
@@ -39,6 +40,9 @@ fn main() {
 
     const TARGET_FRAME_TIME: Duration = Duration::from_nanos(1_000_000_000 / 60); // 60FPS
     const SPIN_THRESHOLD: Duration = Duration::from_millis(2);
+
+    // 環境変数設定
+    env::setup();
 
     // ウィンドウ作成
     let window = Window::new(WINDOW_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT);

@@ -43,6 +43,25 @@ pub fn copy_vulkan_dylib() {
     }
 }
 
+pub fn copy_molten_vk() {
+    const DYLIB_NAME: &str = "libMoltenVK.dylib";
+    const JSON_NAME: &str = "MoltenVK_icd.json";
+
+    let src = deps::get_molten_vk_path();
+    let src = Path::new(&src);
+
+    for n in [DYLIB_NAME, JSON_NAME].iter() {
+        let src = src.join(n);
+        let dst = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap())
+            .join("target")
+            .join(env::var("PROFILE").unwrap())
+            .join(n);
+        if !dst.exists() {
+            fs::copy(src, dst).unwrap();
+        }
+    }
+}
+
 pub fn set_rpath() {
     println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path");
     println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");

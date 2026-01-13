@@ -1,7 +1,6 @@
 //! ビルドスクリプト
 //!
 //! - 依存パッケージのインストール
-//! - Vulkan loaderとのリンク
 //! - Vulkan Validation Layersの実行時有効化のためのconfig.toml生成
 //! - シェーダファイルのコンパイル
 //! - ウィンドウライブラリのビルドおよびリンク
@@ -58,6 +57,7 @@ fn main() {
         macos::build_window_library();
         macos::link_window_library();
         macos::copy_vulkan_dylib();
+        macos::copy_molten_vk();
         macos::set_rpath();
     }
 

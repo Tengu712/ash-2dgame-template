@@ -178,6 +178,25 @@ pub fn install_dependencies() {
         VULKAN_UTILITY_LIBRARIES.install();
         VULKAN_VALIDATION_LAYERS.install();
     }
+    #[cfg(target_os = "macos")]
+    download_molten_vk();
+}
+
+#[cfg(target_os = "macos")]
+fn download_molten_vk() {
+    const URL: &str =
+        "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.1/MoltenVK-macos.tar";
+    const DIR: &str = "deps";
+    const NAME_TAR: &str = "MoltenVK-macos.tar";
+    const NAME_DIR: &str = "MoltenVK-macos";
+
+    if !Path::new(DIR).join(NAME_TAR).exists() {
+        super::run_on(Path::new(DIR), "curl", &["-4", "-o", NAME_TAR, "-L", URL]);
+    }
+    if !Path::new(DIR).join(NAME_DIR).exists() {
+        super::run_on(Path::new(DIR), "mkdir", &[NAME_DIR]);
+        super::run_on(Path::new(DIR), "tar", &["-xf", NAME_TAR, "-C", NAME_DIR]);
+    }
 }
 
 pub fn get_vulkan_lib_path() -> String {
@@ -191,6 +210,20 @@ pub fn get_glslang_path() -> String {
 #[cfg(all(debug_assertions, feature = "vvl"))]
 pub fn get_vvl_path() -> String {
     path_to_string(&VULKAN_VALIDATION_LAYERS.install_path())
+}
+
+#[cfg(target_os = "macos")]
+pub fn get_molten_vk_path() -> String {
+    path_to_string(
+        &Path::new(&env::current_dir().unwrap())
+            .join("deps")
+            .join("MoltenVK-macos")
+            .join("MoltenVK")
+            .join("MoltenVK")
+            .join("dynamic")
+            .join("dylib")
+            .join("macOS"),
+    )
 }
 
 fn path_to_string(path: &Path) -> String {
