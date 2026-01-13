@@ -50,15 +50,19 @@ classDiagram
     class Window
     class Swapchain
     class Framebuffer
+    class InputStates
+    class Game
 
     Entry "1" -- "0..*" Context
     Context "1" -- "0..*" Submitter
     Context "1" -- "0..*" Descriptors
     Context "1" -- "0..*" RenderPass
-    Context "1" -- "0..*" Swapchain
     Context "1" -- "0..*" Framebuffer
-    Window "1" -- "1" Swapchain
+    Context "1" -- "0..*" Swapchain
+    Window "1" -- "0,1" Swapchain
     Swapchain "0,1" -- "0..*" Framebuffer
     Descriptors "0,1" -- "0..*" RenderPass
     Framebuffer "1..*" -- "1" RenderPass
+    Window "1..*" -- "0..*" InputStates
+    Game "0..*" -- "1..*" InputStates
 ```
