@@ -12,6 +12,8 @@ use std::{
 };
 
 mod deps;
+#[cfg(target_os = "linux")]
+mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
 mod shader;
@@ -59,6 +61,11 @@ fn main() {
         macos::copy_vulkan_dylib();
         macos::copy_molten_vk();
         macos::set_rpath();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        linux::build_window_library();
+        linux::link_window_library();
     }
 
     println!("cargo:rerun-if-changed=build.rs");

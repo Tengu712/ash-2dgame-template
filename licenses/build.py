@@ -19,6 +19,7 @@ current_platform = platform.system()
 TARGETS = {
 	'Windows': 'x86_64-pc-windows-msvc',
 	'Darwin': 'aarch64-apple-darwin',
+	'Linux': 'x86_64-unknown-linux-gnu',
 }
 
 target = TARGETS.get(current_platform)
@@ -55,6 +56,8 @@ result = '# Licenses\n\n'
 
 for dep in deps:
 	if dep['name'] == 'MoltenVK' and current_platform != 'Darwin':
+		continue
+	if dep['name'] == 'xcb' and current_platform != 'Linux':
 		continue
 	result += f"## {dep['name']} {dep['version']}\n\n{dep['text']}\n\n\n"
 

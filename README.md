@@ -19,6 +19,8 @@ Rustのashを使った2Dゲーム向けのテンプレートコードです。
 - Ninja
 - MSVC環境 (Windows)
 - Xcode CLT (macOS)
+- g++ (Linux)
+- libxcb (Linux)
 
 次を実行してください:
 

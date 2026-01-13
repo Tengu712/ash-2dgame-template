@@ -27,13 +27,13 @@ impl Swapchain {
     pub fn new(ctx: Rc<Context>, window: Rc<Window>) -> Self {
         // surface
         #[cfg(target_os = "windows")]
-        let surface = window
-            .create_surface(&ctx.win32_surface_loader)
-            .expect_log("failed to create the surface of the window");
+        let surface = window.create_surface(&ctx.win32_surface_loader);
         #[cfg(target_os = "macos")]
-        let surface = window
-            .create_surface(&ctx.metal_surface_loader)
-            .expect_log("failed to create the surface of the window");
+        let surface = window.create_surface(&ctx.metal_surface_loader);
+        #[cfg(target_os = "linux")]
+        let surface = window.create_surface(&ctx.xcb_surface_loader);
+
+        let surface = surface.expect_log("failed to create the surface of the window");
 
         // swapchain
         let window_size = window

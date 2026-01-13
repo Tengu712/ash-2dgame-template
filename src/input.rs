@@ -64,3 +64,15 @@ impl Key {
         }
     }
 }
+
+#[cfg(target_os = "linux")]
+impl Key {
+    fn to_code(self) -> u32 {
+        match self {
+            Self::Left => 113,
+            Self::Right => 114,
+            Self::Return => 36,
+            Self::Menu => 64,
+        }
+    }
+}

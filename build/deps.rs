@@ -163,6 +163,10 @@ const VULKAN_VALIDATION_LAYERS: Dependency = Dependency {
                 "-DVULKAN_UTILITY_LIBRARIES_INSTALL_DIR={}",
                 path_to_string(&VULKAN_UTILITY_LIBRARIES.install_path())
             ),
+            #[cfg(target_os = "linux")]
+            "-DBUILD_WSI_XLIB_SUPPORT=OFF".to_string(),
+            #[cfg(target_os = "linux")]
+            "-DBUILD_WSI_WAYLAND_SUPPORT=OFF".to_string(),
         ]
     },
 };

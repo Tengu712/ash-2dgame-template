@@ -35,6 +35,8 @@ pub struct Context {
     pub win32_surface_loader: khr::win32_surface::Instance,
     #[cfg(target_os = "macos")]
     pub metal_surface_loader: ext::metal_surface::Instance,
+    #[cfg(target_os = "linux")]
+    pub xcb_surface_loader: khr::xcb_surface::Instance,
 }
 
 impl Context {
@@ -52,6 +54,8 @@ impl Context {
         let win32_surface_loader = khr::win32_surface::Instance::new(&ENTRY, &instance);
         #[cfg(target_os = "macos")]
         let metal_surface_loader = ext::metal_surface::Instance::new(&ENTRY, &instance);
+        #[cfg(target_os = "linux")]
+        let xcb_surface_loader = khr::xcb_surface::Instance::new(&ENTRY, &instance);
 
         Self {
             instance,
@@ -65,6 +69,8 @@ impl Context {
             win32_surface_loader,
             #[cfg(target_os = "macos")]
             metal_surface_loader,
+            #[cfg(target_os = "linux")]
+            xcb_surface_loader,
         }
     }
 
@@ -120,6 +126,8 @@ fn create_instance(entry: &Entry, app_name: &CStr, app_version: u32) -> Instance
         c"VK_EXT_metal_surface".as_ptr(),
         c"VK_KHR_portability_enumeration".as_ptr(),
     ];
+    #[cfg(target_os = "linux")]
+    let extensions = [c"VK_KHR_surface".as_ptr(), c"VK_KHR_xcb_surface".as_ptr()];
 
     #[cfg(target_os = "macos")]
     let flags = vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR;

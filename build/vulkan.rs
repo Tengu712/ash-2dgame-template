@@ -26,6 +26,16 @@ pub fn copy_vvl_files_to_deps_dir() {
             "VkLayer_khronos_validation.json",
         ],
     ];
+    #[cfg(target_os = "linux")]
+    const PATHS: [&[&str]; 2] = [
+        &["lib", "libVkLayer_khronos_validation.so"],
+        &[
+            "share",
+            "vulkan",
+            "explicit_layer.d",
+            "VkLayer_khronos_validation.json",
+        ],
+    ];
 
     let src = deps::get_vvl_path();
     let src = Path::new(&src);
