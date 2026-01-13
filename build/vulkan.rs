@@ -41,6 +41,15 @@ pub fn copy_vvl_files_to_deps_dir() {
     }
 }
 
+// VVLを有効化するために必要な実行時環境変数を指定するTOMLファイルを生成する関数
+//
+// NOTE: MoltenVKと違ってVVLへのパスはプロセス起動時に通されていなければならない。
+//       そのため、.cargo/config.tomlに書いておくことで、解決する。
+//       どうせVVLは開発時にしか必要としないので問題ないと考えられる。
+//
+// WARN: このTOMLファイルがない状態で`cargo run --features vvl`すると、
+//       TOMLファイルは生成されるがその内容は反映されない。
+//       そのため2度`run`するか、一度`build`してから`run`すること。
 #[cfg(all(debug_assertions, feature = "vvl"))]
 pub fn generate_config_toml_to_use_vvl() {
     use std::{env, fs, path::Path};
