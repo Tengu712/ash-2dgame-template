@@ -1,0 +1,3 @@
+*
+!.gitignore
+!install_deps.cmake

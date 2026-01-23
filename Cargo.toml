@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 license = "CC0-1.0"
 publish = false
-build = "build/build.rs"
 
 [features]
 # Vulkan Validation Layersをdebug時にインストール・有効化するためのfeature

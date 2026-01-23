@@ -1,7 +1,10 @@
-/.cargo
 /target
-/deps
 
 *.spv
+*.dll
+*.dylib
+*.so
+*.json
+
 log.txt
 LICENSES.txt

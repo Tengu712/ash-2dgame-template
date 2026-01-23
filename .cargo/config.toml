@@ -1,0 +1,4 @@
+# VVL有効時にVVLのライブラリとJSONを発見するための設定
+[env]
+VK_LAYER_PATH     = { value = "deps", force = true, relative = true }
+DYLD_LIBRARY_PATH = { value = "deps", force = true, relative = true }
