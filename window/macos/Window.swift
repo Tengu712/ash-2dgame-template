@@ -24,7 +24,6 @@ class Window: NSObject, NSWindowDelegate {
     window.title = title
     window.center()
     window.makeKeyAndOrderFront(nil)
-    window.styleMask.insert(.fullSizeContentView)
     window.collectionBehavior = .fullScreenPrimary
 
     guard let view = window.contentView else {
