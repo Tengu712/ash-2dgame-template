@@ -64,10 +64,8 @@ class Window: NSObject, NSWindowDelegate {
       case .flagsChanged:
         inputStates[ExtKeyCode.command] = event.modifierFlags.contains(.command)
       default:
-        break
+        app.sendEvent(event)
       }
-
-      app.sendEvent(event)
     }
 
     return running
