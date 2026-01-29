@@ -152,6 +152,9 @@ fn main() {
                 framebuffers =
                     Framebuffer::from_swapchain(&ctx, render_pass.render_pass, &swapchain)
                         .expect_log("failed to recreate framebuffers");
+                render_pass
+                    .recreate_semaohores()
+                    .expect_log("failed to recreate semaphores");
             }
             Err(e) => panic_log(&format!("unrecoverable error occurred: {e}")),
         }

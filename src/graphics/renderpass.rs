@@ -135,6 +135,25 @@ impl<'a> RenderPass<'a> {
             Ok(())
         }
     }
+
+    pub fn recreate_semaohores(&mut self) -> VkResult<()> {
+        unsafe {
+            for semaphore in &mut self.semaphores {
+                self.ctx
+                    .device
+                    .destroy_semaphore(semaphore.started_semaphore, None);
+                self.ctx
+                    .device
+                    .destroy_semaphore(semaphore.finished_semaphore, None);
+                *semaphore = Semaphores {
+                    started_semaphore: create_semaphore(&self.ctx.device)?,
+                    finished_semaphore: create_semaphore(&self.ctx.device)?,
+                };
+            }
+            self.semaphores_counter = 0;
+            Ok(())
+        }
+    }
 }
 
 impl Drop for RenderPass<'_> {
