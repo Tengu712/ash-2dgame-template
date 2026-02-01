@@ -37,6 +37,12 @@ impl Window {
         Self(PhantomData)
     }
 
+    pub fn destroy(self) {
+        unsafe { destroy_window() };
+    }
+}
+
+impl Window {
     pub fn process_events(&self) -> bool {
         unsafe { process_window_events() != 0 }
     }
@@ -78,12 +84,6 @@ impl Window {
 
     pub fn get_input_state(&self, code: u32) -> bool {
         unsafe { get_input_state(code) != 0 }
-    }
-}
-
-impl Drop for Window {
-    fn drop(&mut self) {
-        unsafe { destroy_window() };
     }
 }
 

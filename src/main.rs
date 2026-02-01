@@ -45,6 +45,7 @@ fn main() {
     }
 
     gengine.destroy();
+    window.destroy();
 }
 
 #[cfg(target_os = "macos")]
