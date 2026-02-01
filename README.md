@@ -3,6 +3,7 @@
 ## What's this?
 
 Rustのashを使った2Dゲーム向けのテンプレートコードです。
+主にashを使うときのボイラープレートを提供することを目的としています。
 
 > [!WARNING]
 > マルチスレッドに対応していません。
@@ -34,6 +35,8 @@ cargo build --release
 
 > [!NOTE]
 > 依存パッケージのインストールにそれなりの時間がかかります。
+> 愚直にclone & buildしているからです。
+> Vulkan SDKを使う場合はビルドスクリプトを適宜修正してください。
 
 > [!NOTE]
 > Vulkan Validation Layersはデバッグ時かつ`vvl` feature有効時のみ利用できます。
