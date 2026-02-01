@@ -1,4 +1,6 @@
-use ash::{khr::surface, prelude::VkResult, vk};
+use super::super::context::Context;
+use crate::logs::{LoggableResult, panic_log};
+use ash::vk;
 
 const DESIRED_MIN_IMAGE_COUNT: u32 = 2;
 
@@ -35,15 +37,12 @@ pub struct SurfaceInfoForSwapchain {
 }
 
 impl SurfaceInfoForSwapchain {
-    pub fn from(
-        instance: &surface::Instance,
-        physical_device: vk::PhysicalDevice,
-        surface: vk::SurfaceKHR,
-        window_size: vk::Extent2D,
-    ) -> VkResult<Self> {
+    pub fn from(ctx: &Context, surface: vk::SurfaceKHR, window_size: vk::Extent2D) -> Self {
         unsafe {
-            let caps =
-                instance.get_physical_device_surface_capabilities(physical_device, surface)?;
+            let caps = ctx
+                .surface_loader
+                .get_physical_device_surface_capabilities(ctx.physical_device, surface)
+                .expect_log("failed to get capabilities of a surface");
 
             // resolution
             let resolution = if caps.current_extent.width == u32::MAX {
@@ -69,9 +68,12 @@ impl SurfaceInfoForSwapchain {
             };
 
             // format
-            let formats = instance.get_physical_device_surface_formats(physical_device, surface)?;
+            let formats = ctx
+                .surface_loader
+                .get_physical_device_surface_formats(ctx.physical_device, surface)
+                .expect_log("failed to get surface formats");
             if formats.is_empty() {
-                return Err(vk::Result::ERROR_SURFACE_LOST_KHR);
+                panic_log("no surface format found")
             }
             let format = DESIRED_FORMATS
                 .iter()
@@ -84,8 +86,10 @@ impl SurfaceInfoForSwapchain {
                 .unwrap_or(formats[0]);
 
             // present_mode
-            let present_modes =
-                instance.get_physical_device_surface_present_modes(physical_device, surface)?;
+            let present_modes = ctx
+                .surface_loader
+                .get_physical_device_surface_present_modes(ctx.physical_device, surface)
+                .expect_log("failed to get surface present modes");
             let present_mode = present_modes
                 .iter()
                 .find(|&&mode| mode == DESIRED_PRESENT_MODE)
@@ -99,13 +103,13 @@ impl SurfaceInfoForSwapchain {
                 caps.current_transform
             };
 
-            Ok(Self {
+            Self {
                 resolution,
                 min_image_count,
                 format,
                 present_mode,
                 pre_transform,
-            })
+            }
         }
     }
 }

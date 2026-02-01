@@ -1,7 +1,7 @@
-use super::{context::Context, image::wrap::ImageView};
+use super::context::Context;
 use crate::{logs::*, window::Window};
-use ash::{khr::swapchain, prelude::VkResult, vk};
-use std::{rc::Rc, slice};
+use ash::vk;
+use std::slice;
 
 mod info;
 
@@ -15,130 +15,102 @@ pub struct Swapchain {
     pub resolution: vk::Extent2D,
     pub format: vk::SurfaceFormatKHR,
     pub swapchain: vk::SwapchainKHR,
-    pub image_views: Vec<ImageView>,
-    ctx: Rc<Context>,
-    window: Rc<Window>,
-
-    /// 再作成時に`surface`を破棄しないようにするためのフラグ
-    keep_surface: bool,
+    pub images: Vec<vk::Image>,
 }
 
 impl Swapchain {
-    pub fn new(ctx: Rc<Context>, window: Rc<Window>) -> Self {
-        // surface
+    pub fn new(window: &Window, ctx: &Context) -> Self {
         #[cfg(target_os = "windows")]
         let surface = window.create_surface(&ctx.win32_surface_loader);
         #[cfg(target_os = "macos")]
         let surface = window.create_surface(&ctx.metal_surface_loader);
         #[cfg(target_os = "linux")]
         let surface = window.create_surface(&ctx.xcb_surface_loader);
-
-        let surface = surface.expect_log("failed to create the surface of the window");
-
-        // swapchain
-        let window_size = window
-            .get_current_client_size()
-            .expect_log("failed to get the client size of the window");
-        let info = SurfaceInfoForSwapchain::from(
-            &ctx.surface_loader,
-            ctx.physical_device,
-            surface,
-            window_size,
-        )
-        .expect_log("failed to get info of surface for creating a swapchain");
-        let swapchain = create_swapchain(&ctx.swapchain_loader, surface, &info, None)
-            .expect_log("failed to create a swapchain");
-
-        // image views
-        let image_views =
-            collect_image_views(&ctx, &ctx.swapchain_loader, swapchain, info.format.format)
-                .expect_log("failed to collect the views of swapchain images");
-
+        let surface = surface.expect_log("failed to create a surface");
+        let (resolution, format, swapchain, images) =
+            create_swapchain_util(window, ctx, surface, None);
         Self {
             surface,
-            resolution: info.resolution,
-            format: info.format,
+            resolution,
+            format,
             swapchain,
-            image_views,
-            ctx,
-            window,
-            keep_surface: false,
+            images,
         }
     }
 
-    pub fn recreate(mut self) -> VkResult<Self> {
-        let window_size = self
-            .window
-            .get_current_client_size()
-            .ok_or(vk::Result::ERROR_UNKNOWN)?;
-        let info = SurfaceInfoForSwapchain::from(
-            &self.ctx.surface_loader,
-            self.ctx.physical_device,
-            self.surface,
-            window_size,
-        )?;
-        let swapchain = create_swapchain(
-            &self.ctx.swapchain_loader,
-            self.surface,
-            &info,
-            Some(self.swapchain),
-        )?;
-
-        let image_views = collect_image_views(
-            &self.ctx,
-            &self.ctx.swapchain_loader,
-            swapchain,
-            info.format.format,
-        )?;
-
-        self.keep_surface = true;
-
-        Ok(Self {
-            surface: self.surface,
-            resolution: info.resolution,
-            format: info.format,
-            swapchain,
-            image_views,
-            ctx: Rc::clone(&self.ctx),
-            window: Rc::clone(&self.window),
-            keep_surface: false,
-        })
+    pub fn destroy(self, ctx: &Context, keep_surface: bool) {
+        unsafe {
+            ctx.swapchain_loader.destroy_swapchain(self.swapchain, None);
+            if !keep_surface {
+                ctx.surface_loader.destroy_surface(self.surface, None);
+            }
+        }
     }
 
-    pub fn acquire_next_image_index(&self, signal_semaphore: vk::Semaphore) -> VkResult<u32> {
-        let (index, suboptimal) = unsafe {
-            self.ctx.swapchain_loader.acquire_next_image(
+    pub fn recreate(self, window: &Window, ctx: &Context) -> Self {
+        let surface = self.surface;
+        let (resolution, format, swapchain, images) =
+            create_swapchain_util(window, ctx, surface, Some(self.swapchain));
+        self.destroy(ctx, true);
+        Self {
+            surface,
+            resolution,
+            format,
+            swapchain,
+            images,
+        }
+    }
+}
+
+impl Swapchain {
+    /// 描画準備が完了したスワップチェーンイメージのインデックスを取得する関数
+    ///
+    /// そのスワップチェーンイメージの準備が完了すると`signal_semaphore`がシグナルされる。
+    ///
+    /// Swapchainを再作成すべき場合は`Err`を返し、そうでなければ`Ok`を返す。
+    pub fn acquire_next_image_index(
+        &self,
+        ctx: &Context,
+        signal_semaphore: vk::Semaphore,
+    ) -> Result<u32, ()> {
+        let res = unsafe {
+            ctx.swapchain_loader.acquire_next_image(
                 self.swapchain,
                 u64::MAX,
                 signal_semaphore,
                 vk::Fence::null(),
-            )?
+            )
         };
-        if suboptimal {
-            Err(vk::Result::ERROR_OUT_OF_DATE_KHR)
-        } else {
-            Ok(index)
+        match res {
+            Ok((index, false)) => Ok(index),
+            Ok((_, true)) => Err(()),
+            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => Err(()),
+            _ => panic_log("failed to queue a presentation command"),
         }
     }
 
+    /// プレゼンテーションコマンドをキューする関数
+    ///
+    /// `wait_semaphores`がシグナルされると、
+    /// `index`番目のスワップチェーンイメージがプレゼントされる。
+    ///
+    /// Swapchainを再作成すべき場合は`Err`を返し、そうでなければ`Ok`を返す。
     pub fn queue_presentation_command(
         &self,
+        ctx: &Context,
         index: u32,
         wait_semaphore: vk::Semaphore,
-    ) -> VkResult<()> {
+    ) -> Result<(), ()> {
         let pi = vk::PresentInfoKHR::default()
             .wait_semaphores(slice::from_ref(&wait_semaphore))
             .swapchains(slice::from_ref(&self.swapchain))
             .image_indices(slice::from_ref(&index));
-        let suboptimal = unsafe {
-            self.ctx
-                .swapchain_loader
-                .queue_present(self.ctx.queue, &pi)?
-        };
-        if suboptimal {
-            Err(vk::Result::ERROR_OUT_OF_DATE_KHR)
-        } else {
-            Ok(())
+        let res = unsafe { ctx.swapchain_loader.queue_present(ctx.queue, &pi) };
+        match res {
+            Ok(false) => Ok(()),
+            Ok(true) => Err(()),
+            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => Err(()),
+            _ => panic_log("failed to queue a presentation command"),
         }
     }
 }
@@ -187,26 +159,22 @@ impl Swapchain {
     }
 }
 
-impl Drop for Swapchain {
-    fn drop(&mut self) {
-        unsafe {
-            self.image_views.clear();
-            self.ctx
-                .swapchain_loader
-                .destroy_swapchain(self.swapchain, None);
-            if !self.keep_surface {
-                self.ctx.surface_loader.destroy_surface(self.surface, None);
-            }
-        }
-    }
-}
-
-fn create_swapchain(
-    swapchain_loader: &swapchain::Device,
+fn create_swapchain_util(
+    window: &Window,
+    ctx: &Context,
     surface: vk::SurfaceKHR,
-    info: &SurfaceInfoForSwapchain,
     old_swapchain: Option<vk::SwapchainKHR>,
-) -> VkResult<vk::SwapchainKHR> {
+) -> (
+    vk::Extent2D,
+    vk::SurfaceFormatKHR,
+    vk::SwapchainKHR,
+    Vec<vk::Image>,
+) {
+    let window_size = window
+        .get_current_client_size()
+        .expect_log("failed to get the client size of the window");
+    let info = SurfaceInfoForSwapchain::from(ctx, surface, window_size);
+
     let mut ci = vk::SwapchainCreateInfoKHR::default()
         .surface(surface)
         .min_image_count(info.min_image_count)
@@ -223,22 +191,17 @@ fn create_swapchain(
     if let Some(old_swapchain) = old_swapchain {
         ci.old_swapchain = old_swapchain;
     }
-    unsafe { swapchain_loader.create_swapchain(&ci, None) }
-}
+    let swapchain = unsafe {
+        ctx.swapchain_loader
+            .create_swapchain(&ci, None)
+            .expect_log("failed to create a swapchain")
+    };
 
-fn collect_image_views(
-    ctx: &Rc<Context>,
-    swapchain_loader: &swapchain::Device,
-    swapchain: vk::SwapchainKHR,
-    format: vk::Format,
-) -> VkResult<Vec<ImageView>> {
-    unsafe {
-        swapchain_loader
-            .get_swapchain_images(swapchain)?
-            .into_iter()
-            .map(|image| {
-                ImageView::from(Rc::clone(ctx), image, format, vk::ImageAspectFlags::COLOR)
-            })
-            .collect()
-    }
+    let images = unsafe {
+        ctx.swapchain_loader
+            .get_swapchain_images(swapchain)
+            .expect_log("failed to get swapchain images")
+    };
+
+    (info.resolution, info.format, swapchain, images)
 }

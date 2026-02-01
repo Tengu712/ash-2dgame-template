@@ -1,9 +1,5 @@
-use crate::{
-    graphics::descriptor::transform::{Camera, Instance},
-    input::InputStates,
-};
-use glam::Mat4;
-use std::{cmp::Ordering, collections::HashMap, mem};
+use crate::input::InputStates;
+use std::{collections::HashMap, mem};
 
 mod component;
 mod system;
@@ -20,16 +16,26 @@ pub enum Scene {
     Result,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Camera {
+    pub left: f32,
+    pub right: f32,
+    pub bottom: f32,
+    pub top: f32,
+    pub near: f32,
+    pub far: f32,
+}
+
 pub struct World {
-    next_entity: Entity,
-    components: ComponentStorages,
-    systems: Vec<System>,
+    pub next_entity: Entity,
+    pub components: ComponentStorages,
+    pub systems: Vec<System>,
 
-    setup_systems: HashMap<Scene, SetupSystem>,
-    next_scene: Option<Scene>,
+    pub setup_systems: HashMap<Scene, SetupSystem>,
+    pub next_scene: Option<Scene>,
 
-    camera: Camera,
-    camera_updated: bool,
+    pub camera: Camera,
+    pub camera_updated: bool,
 }
 
 impl World {
@@ -41,8 +47,12 @@ impl World {
             setup_systems: system::create_setup_systems(),
             next_scene: Some(initial_scene),
             camera: Camera {
-                view: Mat4::IDENTITY,
-                proj: Mat4::orthographic_rh(0.0, 640.0, 0.0, 480.0, 0.0, 100.0),
+                left: 0.0,
+                right: 640.0,
+                bottom: 0.0,
+                top: 480.0,
+                near: 0.0,
+                far: 100.0,
             },
             camera_updated: true,
         }
@@ -59,30 +69,6 @@ impl World {
             system(self, input_states);
         }
         self.systems = systems;
-    }
-
-    pub fn collect_render_infos(&mut self) -> (Vec<Instance>, Option<Camera>) {
-        let mut instances = self
-            .components
-            .instances
-            .0
-            .values()
-            .map(|n| n.data)
-            .collect::<Vec<_>>();
-        instances.sort_by(|a, b| {
-            a.transform
-                .w_axis
-                .z
-                .partial_cmp(&b.transform.w_axis.z)
-                .unwrap_or(Ordering::Equal)
-        });
-        let camera = if self.camera_updated {
-            self.camera_updated = false;
-            Some(self.camera)
-        } else {
-            None
-        };
-        (instances, camera)
     }
 
     fn spawn(&mut self) -> Entity {

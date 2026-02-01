@@ -1,56 +1,68 @@
 use super::context::Context;
 use crate::logs::*;
 use ash::{Device, vk};
-use std::{rc::Rc, slice};
+use std::slice;
 
 pub mod transform;
 mod writer;
 
-use transform::Transformation;
+use transform::*;
+
+const MAX_INSTANCE_COUNT: usize = 32;
 
 pub struct Descriptors {
     pub pool: vk::DescriptorPool,
     pub trans: Transformation,
-    ctx: Rc<Context>,
 }
 
 impl Descriptors {
-    pub fn new(ctx: Rc<Context>, max_insts_count: usize) -> Self {
+    pub fn new(ctx: &Context) -> Self {
         let pool = create_descriptor_pool(&ctx.device);
-        let trans = Transformation::new(&ctx, pool, max_insts_count);
-        Self { pool, trans, ctx }
+        let trans = Transformation::new(ctx, pool, MAX_INSTANCE_COUNT);
+        Self { pool, trans }
     }
 
-    pub fn collect_set_layouts(&self) -> Vec<vk::DescriptorSetLayout> {
-        vec![self.trans.layout]
-    }
-
-    pub fn record_bind_command(
-        &self,
-        command_buffer: vk::CommandBuffer,
-        pipeline_layout: vk::PipelineLayout,
-    ) {
+    pub fn destroy(self, ctx: &Context) {
         unsafe {
-            let sets = [self.trans.set];
-            self.ctx.device.cmd_bind_descriptor_sets(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                pipeline_layout,
-                0,
-                &sets,
-                &[],
-            );
+            self.trans.destroy(ctx);
+            ctx.device.destroy_descriptor_pool(self.pool, None);
         }
     }
 }
 
-impl Drop for Descriptors {
-    fn drop(&mut self) {
+impl Descriptors {
+    pub fn collect_set_layouts(&self) -> Vec<vk::DescriptorSetLayout> {
+        vec![self.trans.layout]
+    }
+
+    pub fn upload(&self, ctx: &Context, instances: &[Instance], camera: &Option<Camera>) {
+        if !instances.is_empty() {
+            self.trans.insts_buffer.copy_to_memory(
+                ctx,
+                &instances[..instances.len().min(MAX_INSTANCE_COUNT)],
+                0,
+            );
+        }
+        if let Some(camera) = camera {
+            self.trans.camera_buffer.copy_to_memory(ctx, camera);
+        }
+    }
+
+    pub fn record_bind_command(
+        &self,
+        ctx: &Context,
+        command_buffer: vk::CommandBuffer,
+        pipeline_layout: vk::PipelineLayout,
+    ) {
         unsafe {
-            self.ctx
-                .device
-                .destroy_descriptor_set_layout(self.trans.layout, None);
-            self.ctx.device.destroy_descriptor_pool(self.pool, None);
+            ctx.device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                pipeline_layout,
+                0,
+                &[self.trans.set],
+                &[],
+            );
         }
     }
 }

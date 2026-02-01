@@ -5,10 +5,9 @@ use super::{
     },
     writer::DescriptorWriter,
 };
-use crate::logs::*;
 use ash::vk;
 use glam::{Mat4, Vec4};
-use std::{marker::PhantomData, ptr, rc::Rc};
+use std::{marker::PhantomData, ptr};
 
 pub(super) const BINDINGS: &[vk::DescriptorSetLayoutBinding] = &[
     // instances
@@ -54,18 +53,13 @@ pub struct Transformation {
 }
 
 impl Transformation {
-    pub fn new(ctx: &Rc<Context>, pool: vk::DescriptorPool, max_insts_count: usize) -> Self {
+    pub fn new(ctx: &Context, pool: vk::DescriptorPool, max_insts_count: usize) -> Self {
         let layout = super::create_descriptor_set_layout(&ctx.device, BINDINGS);
         let set = super::allocate_descriptor_set(&ctx.device, pool, layout);
 
-        let insts_buffer = ArrayBuffer::new(
-            Rc::clone(ctx),
-            max_insts_count,
-            vk::BufferUsageFlags::STORAGE_BUFFER,
-        )
-        .expect_log("failed to create a instance buffer");
-        let camera_buffer = Buffer::new(Rc::clone(ctx), vk::BufferUsageFlags::UNIFORM_BUFFER)
-            .expect_log("failed to create a camera buffer");
+        let insts_buffer =
+            ArrayBuffer::new(ctx, max_insts_count, vk::BufferUsageFlags::STORAGE_BUFFER);
+        let camera_buffer = Buffer::new(ctx, vk::BufferUsageFlags::UNIFORM_BUFFER);
 
         let mut writer = DescriptorWriter::with_capacity(BINDINGS.len());
         writer.push_buffer(set, insts_buffer.buffer, &BINDINGS[0]);
@@ -77,6 +71,14 @@ impl Transformation {
             set,
             insts_buffer,
             camera_buffer,
+        }
+    }
+
+    pub fn destroy(self, ctx: &Context) {
+        unsafe {
+            ctx.device.destroy_descriptor_set_layout(self.layout, None);
+            self.camera_buffer.destroy(ctx);
+            self.insts_buffer.destroy(ctx);
         }
     }
 }

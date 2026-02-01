@@ -1,10 +1,12 @@
 use crate::logs::*;
 use ash::{
     khr::{surface, swapchain},
-    prelude::VkResult,
     *,
 };
 use std::{ffi::CStr, slice, sync::LazyLock};
+
+const APPLICATION_NAME: &CStr = c"ash-2dgame-template";
+const APPLICATION_VERSION: u32 = vk::make_api_version(0, 0, 1, 0);
 
 /// Vulkanローダへのハンドルのようなもの
 ///
@@ -40,8 +42,8 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(app_name: &CStr, app_version: u32) -> Self {
-        let instance = create_instance(&ENTRY, app_name, app_version);
+    pub fn new() -> Self {
+        let instance = create_instance(&ENTRY, APPLICATION_NAME, APPLICATION_VERSION);
         let physical_device = select_physical_device(&instance);
         let queue_family_index = find_graphics_queue_family_index(&instance, physical_device);
         let device = create_device(&instance, physical_device, queue_family_index);
@@ -74,12 +76,23 @@ impl Context {
         }
     }
 
-    pub fn wait_idle(&self) -> VkResult<()> {
-        unsafe { self.device.device_wait_idle() }
+    pub fn destroy(self) {
+        unsafe {
+            self.device.destroy_device(None);
+            self.instance.destroy_instance(None);
+        }
     }
 }
 
 impl Context {
+    pub fn wait_idle(&self) {
+        unsafe {
+            self.device
+                .device_wait_idle()
+                .expect_log("failed to wait device")
+        }
+    }
+
     pub fn find_memory_type_index(
         &self,
         type_bits: u32,
@@ -94,16 +107,6 @@ impl Context {
             .enumerate()
             .find(|(i, mtype)| (1 << i) & type_bits != 0 && mtype.property_flags & mask == mask)
             .map(|(i, _)| i as _)
-    }
-}
-
-impl Drop for Context {
-    fn drop(&mut self) {
-        unsafe {
-            let _ = self.device.device_wait_idle();
-            self.device.destroy_device(None);
-            self.instance.destroy_instance(None);
-        }
     }
 }
 
