@@ -83,7 +83,7 @@ pub fn collect_render_infos(
         .iter()
         .map(|instance| Instance {
             transform: Mat4::from_translation(instance.position)
-                * Mat4::from_scale(instance.scaling),
+                * Mat4::from_scale(instance.scaling.extend(1.0)),
             color: instance.color,
         })
         .collect();

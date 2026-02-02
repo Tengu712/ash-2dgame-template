@@ -1,5 +1,5 @@
 use crate::input::InputStates;
-use glam::{Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4};
 
 pub mod game;
 pub mod title;
@@ -7,7 +7,7 @@ pub mod title;
 #[derive(Debug, Clone, Copy)]
 pub struct Instance {
     pub position: Vec3,
-    pub scaling: Vec3,
+    pub scaling: Vec2,
     pub color: Vec4,
 }
 
@@ -15,7 +15,7 @@ impl Default for Instance {
     fn default() -> Self {
         Self {
             position: Vec3::ZERO,
-            scaling: Vec3::new(1.0, 1.0, 1.0),
+            scaling: Vec2::new(1.0, 1.0),
             color: Vec4::new(1.0, 1.0, 1.0, 1.0),
         }
     }
