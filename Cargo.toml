@@ -12,4 +12,3 @@ vvl = []
 [dependencies]
 ash = { version = "0.38.0", features = ["std", "linked", "debug"] }
 glam = "0.30"
-procmacro = { path = "procmacro" }
