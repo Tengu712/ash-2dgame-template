@@ -3,18 +3,18 @@ use crate::input::Key;
 use glam::Vec2;
 use std::f32::consts::{FRAC_PI_4, PI};
 
-const BAR_Y: f32 = 0.75;
-const BAR_SIZE: Vec2 = Vec2::new(0.25, 0.05);
-const BAR_SPEED: f32 = 0.025;
+const BAR_Y: f32 = 420.0;
+const BAR_SIZE: Vec2 = Vec2::new(80.0, 12.0);
+const BAR_SPEED: f32 = 8.0;
 
-const BALL_SIZE: Vec2 = Vec2::new(0.03, 0.03);
-const BALL_SPEED: f32 = 0.015;
+const BALL_SIZE: Vec2 = Vec2::new(10.0, 10.0);
+const BALL_SPEED: f32 = 5.0;
 
 const BLOCK_ROWS: usize = 3;
 const BLOCK_COLS: usize = 5;
-const BLOCK_SIZE: Vec2 = Vec2::new(0.18, 0.08);
-const BLOCK_START_Y: f32 = -0.5;
-const BLOCK_SPACING: Vec2 = Vec2::new(0.22, 0.12);
+const BLOCK_SIZE: Vec2 = Vec2::new(58.0, 20.0);
+const BLOCK_START_Y: f32 = 120.0;
+const BLOCK_SPACING: Vec2 = Vec2::new(70.0, 30.0);
 
 #[derive(Clone, Copy)]
 struct Bar {
@@ -23,14 +23,16 @@ struct Bar {
 
 impl Bar {
     fn new() -> Self {
-        Self { x: 0.0 }
+        Self {
+            x: VIRTUAL_WIDTH_HALF,
+        }
     }
 
     fn update(self, istates: &InputStates) -> Self {
         let r = (istates.get(Key::Right) > 0) as i32;
         let l = (istates.get(Key::Left) > 0) as i32;
         let dx = (r - l) as f32 * BAR_SPEED;
-        let x = (self.x + dx).clamp(-1.0 + BAR_SIZE.x / 2.0, 1.0 - BAR_SIZE.x / 2.0);
+        let x = (self.x + dx).clamp(BAR_SIZE.x / 2.0, VIRTUAL_WIDTH - BAR_SIZE.x / 2.0);
         Self { x }
     }
 
@@ -48,17 +50,17 @@ struct Ball {
 impl Ball {
     fn new() -> Self {
         Self {
-            pos: Vec2::new(0.0, 0.3),
+            pos: Vec2::new(VIRTUAL_WIDTH_HALF, 312.0),
             angle: FRAC_PI_4,
         }
     }
 
     fn update(self, bar: &Bar) -> Self {
         let mut angle = self.angle;
-        if self.pos.x <= -1.0 || self.pos.x >= 1.0 {
+        if self.pos.x <= 0.0 || self.pos.x >= VIRTUAL_WIDTH {
             angle = PI - angle;
         }
-        if self.pos.y <= -1.0 {
+        if self.pos.y <= 0.0 {
             angle = -angle;
         }
         if collides_point_rect(self.pos, bar.pos(), BAR_SIZE) {
@@ -81,7 +83,8 @@ fn create_blocks() -> Vec<Block> {
     (0..BLOCK_ROWS)
         .flat_map(|row| {
             (0..BLOCK_COLS).map(move |col| {
-                let x = (col as f32 - (BLOCK_COLS - 1) as f32 / 2.0) * BLOCK_SPACING.x;
+                let x = VIRTUAL_WIDTH_HALF
+                    + (col as f32 - (BLOCK_COLS - 1) as f32 / 2.0) * BLOCK_SPACING.x;
                 let y = BLOCK_START_Y + row as f32 * BLOCK_SPACING.y;
                 Block {
                     pos: Vec2::new(x, y),
@@ -116,7 +119,7 @@ fn reflect_radial(org: Vec2, trg: Vec2) -> f32 {
 
 /// 点と長方形の衝突を判定する関数
 fn collides_point_rect(p: Vec2, r_pos: Vec2, r_size: Vec2) -> bool {
-    (p.x - r_pos.x).abs() < r_size.x && (p.y - r_pos.y).abs() < r_size.y
+    (p.x - r_pos.x).abs() < r_size.x / 2.0 && (p.y - r_pos.y).abs() < r_size.y / 2.0
 }
 
 pub struct States {
@@ -140,7 +143,7 @@ impl States {
         let (ball, blocks) = collide_ball_blocks(ball, self.blocks);
 
         // 負け
-        if ball.pos.y > 1.0 {
+        if ball.pos.y > VIRTUAL_HEIGHT {
             return title::States::new().update(istates);
         }
         // 勝ち
