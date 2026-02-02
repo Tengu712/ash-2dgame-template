@@ -25,6 +25,10 @@ fn main() {
     let mut gengine = GraphicsEngine::new(&window);
     let mut istates = InputStates::default();
     let mut gstate = GameState::default();
+    let mut camera = Camera {
+        view: Mat4::ZERO,
+        proj: Mat4::ZERO,
+    };
     let mut frame_start = Instant::now();
 
     while window.process_events() {
@@ -43,8 +47,9 @@ fn main() {
         gstate = ngstate;
 
         // 描画
-        let (instances, camera) = collect_render_infos(rinfo);
-        gengine = gengine.draw_frame(&window, instances, camera);
+        let (instances, ncamera) = collect_render_infos(rinfo, camera);
+        camera = ncamera.unwrap_or(camera);
+        gengine = gengine.draw_frame(&window, instances, ncamera);
 
         // 60FPS制限
         frame_start = sync_60fps(frame_start);
@@ -69,7 +74,10 @@ fn set_env_for_molten_vk() {
     }
 }
 
-pub fn collect_render_infos(rinfo: RenderingInfo) -> (Vec<Instance>, Option<Camera>) {
+pub fn collect_render_infos(
+    rinfo: RenderingInfo,
+    camera_cache: Camera,
+) -> (Vec<Instance>, Option<Camera>) {
     let instances = rinfo
         .instances
         .iter()
@@ -79,10 +87,17 @@ pub fn collect_render_infos(rinfo: RenderingInfo) -> (Vec<Instance>, Option<Came
             color: instance.color,
         })
         .collect();
-    let camera = Some(Camera {
+
+    let camera = Camera {
         view: Mat4::from_translation(-rinfo.camera.position),
         proj: Mat4::from_scale(rinfo.camera.scaling.recip()),
-    });
+    };
+    let camera = if camera == camera_cache {
+        None
+    } else {
+        Some(camera)
+    };
+
     (instances, camera)
 }
 

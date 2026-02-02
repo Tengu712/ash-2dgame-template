@@ -38,7 +38,7 @@ pub struct Instance {
 }
 
 #[repr(C, align(16))]
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Camera {
     pub view: Mat4,
     pub proj: Mat4,
