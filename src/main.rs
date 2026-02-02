@@ -1,5 +1,4 @@
 use std::{
-    cmp::Ordering,
     hint, thread,
     time::{Duration, Instant},
 };
@@ -12,7 +11,7 @@ mod logs;
 mod window;
 
 use config::*;
-use game::{Scene, World};
+use game::{GameState, RenderingInfo};
 use glam::Mat4;
 use graphics::{GraphicsEngine, descriptor::transform::*};
 use input::{InputStates, Key};
@@ -25,22 +24,29 @@ fn main() {
     let window = Window::new("ash-2dgame-template", SCREEN_WIDTH, SCREEN_HEIGHT);
     let mut gengine = GraphicsEngine::new(&window);
     let mut istates = InputStates::default();
-    let mut world = World::new(Scene::Title);
+    let mut gstate = GameState::default();
     let mut frame_start = Instant::now();
 
     while window.process_events() {
+        // 入力状態更新
         istates = istates.update(&window);
+
+        // フルスクリーン/ウィンドウ切替え
         if istates.get(Key::Menu) > 0 && istates.get(Key::Return) == 1 {
             gengine = gengine.ensure_idle();
             window.toggle_fullscreen();
             gengine = gengine.recreate_swapchain(&window);
         }
 
-        world.run(&istates);
+        // ゲーム状態更新&描画情報取得
+        let (ngstate, rinfo) = gstate.update(&istates);
+        gstate = ngstate;
 
-        let (instances, camera) = collect_render_infos(&mut world);
+        // 描画
+        let (instances, camera) = collect_render_infos(rinfo);
         gengine = gengine.draw_frame(&window, instances, camera);
 
+        // 60FPS制限
         frame_start = sync_60fps(frame_start);
     }
 
@@ -63,39 +69,20 @@ fn set_env_for_molten_vk() {
     }
 }
 
-pub fn collect_render_infos(world: &mut World) -> (Vec<Instance>, Option<Camera>) {
-    let mut instances = world
-        .components
+pub fn collect_render_infos(rinfo: RenderingInfo) -> (Vec<Instance>, Option<Camera>) {
+    let instances = rinfo
         .instances
-        .0
-        .values()
-        .map(|n| n.data)
-        .collect::<Vec<_>>();
-    instances.sort_by(|a, b| {
-        a.transform
-            .w_axis
-            .z
-            .partial_cmp(&b.transform.w_axis.z)
-            .unwrap_or(Ordering::Equal)
-    });
-
-    let camera = if world.camera_updated {
-        world.camera_updated = false;
-        Some(Camera {
-            view: Mat4::IDENTITY,
-            proj: Mat4::orthographic_rh(
-                world.camera.left,
-                world.camera.right,
-                world.camera.bottom,
-                world.camera.top,
-                world.camera.near,
-                world.camera.far,
-            ),
+        .iter()
+        .map(|instance| Instance {
+            transform: Mat4::from_translation(instance.position)
+                * Mat4::from_scale(instance.scaling),
+            color: instance.color,
         })
-    } else {
-        None
-    };
-
+        .collect();
+    let camera = Some(Camera {
+        view: Mat4::from_translation(-rinfo.camera.position),
+        proj: Mat4::from_scale(rinfo.camera.scaling.recip()),
+    });
     (instances, camera)
 }
 

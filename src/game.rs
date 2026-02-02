@@ -1,89 +1,63 @@
 use crate::input::InputStates;
-use std::{collections::HashMap, mem};
+use glam::{Vec3, Vec4};
 
-mod component;
-mod system;
+pub mod game;
+pub mod title;
 
-use component::ComponentStorages;
-use system::{SetupSystem, System};
+#[derive(Debug, Clone, Copy)]
+pub struct Instance {
+    pub position: Vec3,
+    pub scaling: Vec3,
+    pub color: Vec4,
+}
 
-type Entity = usize;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Scene {
-    Title,
-    Play,
-    Result,
+impl Default for Instance {
+    fn default() -> Self {
+        Self {
+            position: Vec3::ZERO,
+            scaling: Vec3::new(1.0, 1.0, 1.0),
+            color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Camera {
-    pub left: f32,
-    pub right: f32,
-    pub bottom: f32,
-    pub top: f32,
-    pub near: f32,
-    pub far: f32,
+    pub position: Vec3,
+    pub scaling: Vec3,
 }
 
-pub struct World {
-    pub next_entity: Entity,
-    pub components: ComponentStorages,
-    pub systems: Vec<System>,
-
-    pub setup_systems: HashMap<Scene, SetupSystem>,
-    pub next_scene: Option<Scene>,
-
-    pub camera: Camera,
-    pub camera_updated: bool,
-}
-
-impl World {
-    pub fn new(initial_scene: Scene) -> Self {
+impl Default for Camera {
+    fn default() -> Self {
         Self {
-            next_entity: 0,
-            components: ComponentStorages::default(),
-            systems: Vec::new(),
-            setup_systems: system::create_setup_systems(),
-            next_scene: Some(initial_scene),
-            camera: Camera {
-                left: 0.0,
-                right: 640.0,
-                bottom: 0.0,
-                top: 480.0,
-                near: 0.0,
-                far: 100.0,
-            },
-            camera_updated: true,
+            position: Vec3::ZERO,
+            scaling: Vec3::new(1.0, 1.0, 1.0),
         }
     }
+}
 
-    pub fn run(&mut self, input_states: &InputStates) {
-        if let Some(next_scene) = self.next_scene.take()
-            && let Some(setup_system) = self.setup_systems.get(&next_scene)
-        {
-            setup_system(self);
+#[derive(Debug, Default, Clone)]
+pub struct RenderingInfo {
+    pub instances: Vec<Instance>,
+    pub camera: Camera,
+}
+
+pub enum GameState {
+    Title(Box<title::States>),
+    Game(Box<game::States>),
+}
+
+impl GameState {
+    pub fn update(self, istates: &InputStates) -> (Self, RenderingInfo) {
+        match self {
+            Self::Title(state) => state.update(istates),
+            Self::Game(state) => state.update(istates),
         }
-        let systems = mem::take(&mut self.systems);
-        for system in &systems {
-            system(self, input_states);
-        }
-        self.systems = systems;
     }
+}
 
-    fn spawn(&mut self) -> Entity {
-        let entity = self.next_entity;
-        self.next_entity += 1;
-        entity
-    }
-
-    fn destroy(&mut self, entity: Entity) {
-        self.components.destroy_entity(entity);
-    }
-
-    fn clear(&mut self) {
-        self.next_entity = 0;
-        self.components.clear();
-        self.systems.clear();
+impl Default for GameState {
+    fn default() -> Self {
+        Self::Title(Box::new(title::States::new()))
     }
 }
