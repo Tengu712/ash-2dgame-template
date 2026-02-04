@@ -33,12 +33,16 @@ impl<T> LoggableOption<T> for Option<T> {
 }
 
 pub fn panic_log(message: &str) -> ! {
-    let _ = append_log(message);
+    let _ = append_log(message, "ERROR");
     Window::show_error_dialog(message);
     panic!("{message}");
 }
 
-fn append_log(message: &str) -> Result<(), ()> {
+pub fn warn(message: &str) {
+    let _ = append_log(message, "WARN");
+}
+
+fn append_log(message: &str, category: &str) -> Result<(), ()> {
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
@@ -49,6 +53,6 @@ fn append_log(message: &str) -> Result<(), ()> {
         .map_err(|_| ())?
         .as_secs()
         .to_string();
-    writeln!(file, "[{timestamp} ERROR] {message}").map_err(|_| ())?;
+    writeln!(file, "[{timestamp} {category}] {message}").map_err(|_| ())?;
     Ok(())
 }

@@ -1,4 +1,4 @@
-use super::context::Context;
+use super::{buffer::ArrayBuffer, context::Context};
 use crate::logs::*;
 use ash::{Device, vk};
 
@@ -76,6 +76,25 @@ impl Image {
     }
 }
 
+impl Image {
+    /// バッファ上のデータをイメージにアップロードするメソッド
+    pub fn upload(
+        &self,
+        ctx: &Context,
+        command_buffer: vk::CommandBuffer,
+        staging: &ArrayBuffer<u8>,
+        width: u32,
+        height: u32,
+    ) {
+        match self {
+            Self::Owned { image, .. } => {
+                upload_image_data(ctx, command_buffer, staging, width, height, *image);
+            }
+            _ => panic!("Internal error: try to upload data to wrapped image"),
+        }
+    }
+}
+
 fn create_image_util(
     ctx: &Context,
     extent: vk::Extent3D,
@@ -145,5 +164,93 @@ fn create_image_view(
         device
             .create_image_view(&ci, None)
             .expect_log("failed to create an image view")
+    }
+}
+
+fn upload_image_data(
+    ctx: &Context,
+    command_buffer: vk::CommandBuffer,
+    staging: &ArrayBuffer<u8>,
+    width: u32,
+    height: u32,
+    image: vk::Image,
+) {
+    unsafe {
+        // イメージレイアウトをTRANSFER_DST_OPTIMALに変更
+        let barrier = vk::ImageMemoryBarrier::default()
+            .old_layout(vk::ImageLayout::UNDEFINED)
+            .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .image(image)
+            .subresource_range(vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            })
+            .src_access_mask(vk::AccessFlags::empty())
+            .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE);
+        ctx.device.cmd_pipeline_barrier(
+            command_buffer,
+            vk::PipelineStageFlags::TOP_OF_PIPE,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::DependencyFlags::empty(),
+            &[],
+            &[],
+            &[barrier],
+        );
+
+        // アップロード
+        let region = vk::BufferImageCopy::default()
+            .buffer_offset(0)
+            .buffer_row_length(0)
+            .buffer_image_height(0)
+            .image_subresource(vk::ImageSubresourceLayers {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                mip_level: 0,
+                base_array_layer: 0,
+                layer_count: 1,
+            })
+            .image_offset(vk::Offset3D { x: 0, y: 0, z: 0 })
+            .image_extent(vk::Extent3D {
+                width,
+                height,
+                depth: 1,
+            });
+        ctx.device.cmd_copy_buffer_to_image(
+            command_buffer,
+            staging.buffer,
+            image,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            &[region],
+        );
+
+        // イメージレイアウトをSHADER_READ_ONLY_OPTIMALに変更
+        let barrier = vk::ImageMemoryBarrier::default()
+            .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+            .new_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .image(image)
+            .subresource_range(vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            })
+            .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+            .dst_access_mask(vk::AccessFlags::SHADER_READ);
+        ctx.device.cmd_pipeline_barrier(
+            command_buffer,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::PipelineStageFlags::FRAGMENT_SHADER,
+            vk::DependencyFlags::empty(),
+            &[],
+            &[],
+            &[barrier],
+        );
     }
 }

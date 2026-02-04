@@ -8,6 +8,7 @@ mod game;
 mod graphics;
 mod input;
 mod logs;
+mod res;
 mod window;
 
 use config::*;
@@ -15,6 +16,7 @@ use game::{GameState, RenderingInfo};
 use glam::Mat4;
 use graphics::{GraphicsEngine, descriptor::transform::*};
 use input::{InputStates, Key};
+use res::*;
 use window::Window;
 
 fn main() {
@@ -30,6 +32,9 @@ fn main() {
         proj: Mat4::ZERO,
     };
     let mut frame_start = Instant::now();
+
+    // TODO: ゲーム更新時の副作用として扱う
+    gengine = gengine.load_image(&IMAGE);
 
     while window.process_events() {
         // 入力状態更新

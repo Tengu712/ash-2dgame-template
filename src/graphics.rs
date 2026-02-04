@@ -1,5 +1,6 @@
-use crate::{config::*, window::Window};
+use crate::{config::*, logs::*, res::Resource, window::Window};
 use ash::vk;
+use std::collections::HashMap;
 
 pub mod buffer;
 pub mod context;
@@ -9,12 +10,15 @@ pub mod renderpass;
 pub mod submit;
 pub mod swapchain;
 pub mod sync;
+mod utils;
 
+use buffer::ArrayBuffer;
 use context::Context;
 use descriptor::{
     Descriptors,
     transform::{Camera, Instance},
 };
+use image::Image;
 use renderpass::{RenderAreas, RenderPass};
 use submit::{SubmittedSubmitter, Submitter};
 use swapchain::Swapchain;
@@ -41,6 +45,9 @@ pub struct GraphicsEngine {
     render_pass: RenderPass,
     synchronizer: Synchronizer,
     submitter: SubmitterState,
+
+    submitter_for_image: Submitter,
+    images: HashMap<Resource, Image>,
 }
 
 impl GraphicsEngine {
@@ -51,6 +58,7 @@ impl GraphicsEngine {
         let render_pass = RenderPass::new(&ctx, &swapchain, &descriptors.collect_set_layouts());
         let synchronizer = Synchronizer::new(&ctx, swapchain.images.len());
         let submitter = SubmitterState::Idle(Submitter::new(&ctx));
+        let submitter_for_image = Submitter::new(&ctx);
         Self {
             ctx,
             swapchain,
@@ -58,11 +66,17 @@ impl GraphicsEngine {
             render_pass,
             synchronizer,
             submitter,
+            submitter_for_image,
+            images: HashMap::new(),
         }
     }
 
     pub fn destroy(self) {
         self.ctx.wait_idle();
+        for (_, image) in self.images {
+            image.destroy(&self.ctx);
+        }
+        self.submitter_for_image.destroy(&self.ctx);
         self.submitter.wait(&self.ctx).destroy(&self.ctx);
         self.synchronizer.destroy(&self.ctx);
         self.render_pass.destroy(&self.ctx);
@@ -158,5 +172,57 @@ impl GraphicsEngine {
             synchronizer,
             ..self
         }
+    }
+}
+
+impl GraphicsEngine {
+    /// 画像をロードするメソッド
+    ///
+    /// 失敗時は警告レベルでログを取り、何もしない。
+    pub fn load_image(mut self, res: &Resource) -> Self {
+        if self.images.contains_key(res) {
+            return self;
+        }
+
+        // PNGデコード
+        let (data, width, height) = match utils::decode_png(res.0) {
+            Ok(v) => v,
+            Err(e) => {
+                warn(&e.to_string());
+                return self;
+            }
+        };
+
+        // イメージ作成
+        let image = Image::new(
+            &self.ctx,
+            width,
+            height,
+            vk::Format::R8G8B8A8_SRGB, // NOTE: ファイルによってはこのフォーマットじゃないかもね
+            vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+            vk::ImageAspectFlags::COLOR,
+        );
+
+        // ステージングバッファ作成&アップロード
+        let staging =
+            ArrayBuffer::<u8>::new(&self.ctx, data.len(), vk::BufferUsageFlags::TRANSFER_SRC);
+        staging.copy_to_memory(&self.ctx, &data, 0);
+
+        // アップロード
+        let recording = self.submitter_for_image.start(&self.ctx);
+        image.upload(
+            &self.ctx,
+            recording.command_buffer(),
+            &staging,
+            width,
+            height,
+        );
+        let waiter = recording.submit(&self.ctx, &[], &[]);
+        self.submitter_for_image = waiter.wait(&self.ctx);
+
+        // 終了
+        staging.destroy(&self.ctx);
+        self.images.insert(*res, image);
+        self
     }
 }
