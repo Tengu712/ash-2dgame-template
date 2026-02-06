@@ -1,5 +1,5 @@
 use super::*;
-use glam::Vec2;
+use glam::{Vec2, Vec3, Vec4};
 use std::f32::consts::{FRAC_PI_4, PI};
 
 const BAR_Y: f32 = 420.0;
@@ -127,57 +127,44 @@ pub struct States {
     blocks: Vec<Block>,
 }
 
-impl States {
-    pub fn new() -> Self {
-        Self {
-            bar: Bar::new(),
-            ball: Ball::new(),
-            blocks: create_blocks(),
-        }
+pub fn init() -> States {
+    States {
+        bar: Bar::new(),
+        ball: Ball::new(),
+        blocks: create_blocks(),
+    }
+}
+
+pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) -> GameState {
+    let bar = states.bar.update(istates);
+    let ball = states.ball.update(&bar);
+    let (ball, blocks) = collide_ball_blocks(ball, states.blocks);
+
+    // ゲームオーバ
+    if ball.pos.y > VIRTUAL_HEIGHT || blocks.iter().all(|b| !b.alive) {
+        return title::update(title::init(), istates, effects);
     }
 
-    pub fn update(self, istates: &InputStates) -> (GameState, RenderingInfo) {
-        let bar = self.bar.update(istates);
-        let ball = self.ball.update(&bar);
-        let (ball, blocks) = collide_ball_blocks(ball, self.blocks);
+    // バー
+    effects.push(Effect::Draw {
+        position: Vec3::new(bar.x, BAR_Y, 0.0),
+        scaling: Vec2::new(BAR_SIZE.x, BAR_SIZE.y),
+        color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+    });
+    // ボール
+    effects.push(Effect::Draw {
+        position: Vec3::new(ball.pos.x, ball.pos.y, 0.0),
+        scaling: Vec2::new(BALL_SIZE.x, BALL_SIZE.y),
+        color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+    });
+    // ブロック
+    blocks.iter().filter(|block| block.alive).for_each(|block| {
+        effects.push(Effect::Draw {
+            position: Vec3::new(block.pos.x, block.pos.y, 0.0),
+            scaling: Vec2::new(BLOCK_SIZE.x, BLOCK_SIZE.y),
+            color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+        })
+    });
 
-        // 負け
-        if ball.pos.y > VIRTUAL_HEIGHT {
-            return title::States::new().update(istates);
-        }
-        // 勝ち
-        if blocks.iter().all(|b| !b.alive) {
-            return title::States::new().update(istates);
-        }
-
-        let mut instances = Vec::with_capacity(1 + 1 + BLOCK_ROWS * BLOCK_COLS);
-        // バー
-        instances.push(Instance {
-            position: Vec3::new(bar.x, BAR_Y, 0.0),
-            scaling: Vec2::new(BAR_SIZE.x, BAR_SIZE.y),
-            ..Default::default()
-        });
-        // ボール
-        instances.push(Instance {
-            position: Vec3::new(ball.pos.x, ball.pos.y, 0.0),
-            scaling: Vec2::new(BALL_SIZE.x, BALL_SIZE.y),
-            ..Default::default()
-        });
-        // ブロック
-        blocks.iter().filter(|block| block.alive).for_each(|block| {
-            instances.push(Instance {
-                position: Vec3::new(block.pos.x, block.pos.y, 0.0),
-                scaling: Vec2::new(BLOCK_SIZE.x, BLOCK_SIZE.y),
-                ..Default::default()
-            })
-        });
-
-        (
-            GameState::Game(Box::new(Self { bar, ball, blocks })),
-            RenderingInfo {
-                instances,
-                ..Default::default()
-            },
-        )
-    }
+    GameState::Game(States { bar, ball, blocks })
 }

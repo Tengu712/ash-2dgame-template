@@ -11,14 +11,27 @@ mod res;
 mod window;
 
 use config::*;
-use game::{GameState, RenderingInfo};
-use glam::Mat4;
+use game::GameState;
+use glam::*;
 use graphics::{GraphicsEngine, descriptor::transform::*};
 use res::*;
 use window::{
     Window,
     input::{InputStates, Key},
 };
+
+enum Effect {
+    Draw {
+        position: Vec3,
+        scaling: Vec2,
+        color: Vec4,
+    },
+    LoadImage(Resource),
+    UpdateCamera {
+        position: Vec3,
+        scaling: Vec3,
+    },
+}
 
 fn main() {
     #[cfg(target_os = "macos")]
@@ -28,14 +41,11 @@ fn main() {
     let mut gengine = GraphicsEngine::new(&window);
     let mut istates = InputStates::default();
     let mut gstate = GameState::default();
-    let mut camera = Camera {
-        view: Mat4::ZERO,
-        proj: Mat4::ZERO,
-    };
     let mut frame_start = Instant::now();
 
-    // TODO: ゲーム更新時の副作用として扱う
-    gengine = gengine.load_image(&IMAGE);
+    // NOTE: パフォーマンスのための可変変数
+    let mut effects_buf = Vec::new();
+    let mut instances = Vec::new();
 
     while window.process_events() {
         // 入力状態更新
@@ -48,14 +58,35 @@ fn main() {
             gengine = gengine.recreate_swapchain(&window);
         }
 
-        // ゲーム状態更新&描画情報取得
-        let (ngstate, rinfo) = gstate.update(&istates);
-        gstate = ngstate;
+        // ゲーム状態更新
+        gstate = gstate.update(&istates, &mut effects_buf);
+
+        // 副作用処理
+        let mut camera = None;
+        instances.clear();
+        for effect in effects_buf.drain(..) {
+            match effect {
+                Effect::Draw {
+                    position,
+                    scaling,
+                    color,
+                } => instances.push(Instance {
+                    transform: Mat4::from_translation(position)
+                        * Mat4::from_scale(scaling.extend(1.0)),
+                    color,
+                }),
+                Effect::LoadImage(res) => gengine = gengine.load_image(&res),
+                Effect::UpdateCamera { position, scaling } => {
+                    camera = Some(Camera {
+                        view: Mat4::from_translation(-position),
+                        proj: Mat4::from_scale(scaling.recip()),
+                    })
+                }
+            }
+        }
 
         // 描画
-        let (instances, ncamera) = collect_render_infos(rinfo, camera);
-        camera = ncamera.unwrap_or(camera);
-        gengine = gengine.draw_frame(&window, instances, ncamera);
+        gengine = gengine.draw_frame(&window, &instances, &camera);
 
         // 60FPS制限
         frame_start = sync_60fps(frame_start);
@@ -78,33 +109,6 @@ fn set_env_for_molten_vk() {
         env::set_var("VK_ICD_FILENAMES", exe_dir);
         env::set_var("MVK_CONFIG_LOG_LEVEL", "0");
     }
-}
-
-pub fn collect_render_infos(
-    rinfo: RenderingInfo,
-    camera_cache: Camera,
-) -> (Vec<Instance>, Option<Camera>) {
-    let instances = rinfo
-        .instances
-        .iter()
-        .map(|instance| Instance {
-            transform: Mat4::from_translation(instance.position)
-                * Mat4::from_scale(instance.scaling.extend(1.0)),
-            color: instance.color,
-        })
-        .collect();
-
-    let camera = Camera {
-        view: Mat4::from_translation(-rinfo.camera.position),
-        proj: Mat4::from_scale(rinfo.camera.scaling.recip()),
-    };
-    let camera = if camera == camera_cache {
-        None
-    } else {
-        Some(camera)
-    };
-
-    (instances, camera)
 }
 
 pub fn sync_60fps(start: Instant) -> Instant {

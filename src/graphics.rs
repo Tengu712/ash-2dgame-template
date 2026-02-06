@@ -98,8 +98,8 @@ impl GraphicsEngine {
     pub fn draw_frame(
         mut self,
         window: &Window,
-        instances: Vec<Instance>,
-        camera: Option<Camera>,
+        instances: &[Instance],
+        camera: &Option<Camera>,
     ) -> Self {
         // 準備
         let semaphores = self.synchronizer.current();
@@ -120,7 +120,7 @@ impl GraphicsEngine {
         let submitter = self.submitter.wait(&self.ctx);
 
         // ディスクリプタ更新
-        self.descriptors.upload(&self.ctx, &instances, &camera);
+        self.descriptors.upload(&self.ctx, instances, camera);
 
         // 記録
         let recorder = submitter.start(&self.ctx);
