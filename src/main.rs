@@ -6,7 +6,6 @@ use std::{
 mod config;
 mod game;
 mod graphics;
-mod input;
 mod logs;
 mod res;
 mod window;
@@ -15,9 +14,11 @@ use config::*;
 use game::{GameState, RenderingInfo};
 use glam::Mat4;
 use graphics::{GraphicsEngine, descriptor::transform::*};
-use input::{InputStates, Key};
 use res::*;
-use window::Window;
+use window::{
+    Window,
+    input::{InputStates, Key},
+};
 
 fn main() {
     #[cfg(target_os = "macos")]

@@ -11,3 +11,5 @@ pub use linux::*;
 pub use macos::*;
 #[cfg(target_os = "windows")]
 pub use windows::*;
+
+pub mod input;

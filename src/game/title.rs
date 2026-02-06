@@ -1,5 +1,4 @@
 use super::*;
-use crate::input::Key;
 
 pub struct States;
 

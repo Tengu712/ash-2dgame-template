@@ -1,4 +1,4 @@
-use crate::input::InputStates;
+use crate::window::input::*;
 use glam::{Vec2, Vec3, Vec4};
 
 pub mod game;

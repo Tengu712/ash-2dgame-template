@@ -74,8 +74,8 @@ impl Window {
         unsafe { toggle_fullscreen() }
     }
 
-    pub fn get_input_state(&self, code: u16) -> bool {
-        unsafe { get_input_state(code) != 0 }
+    pub fn get_input_state(&self, code: u32) -> bool {
+        unsafe { get_input_state(code as u16) != 0 }
     }
 }
 

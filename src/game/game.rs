@@ -1,5 +1,4 @@
 use super::*;
-use crate::input::Key;
 use glam::Vec2;
 use std::f32::consts::{FRAC_PI_4, PI};
 
