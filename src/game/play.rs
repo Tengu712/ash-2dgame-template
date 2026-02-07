@@ -170,5 +170,5 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
         })
     });
 
-    GameState::Game(States { bar, ball, blocks })
+    GameState::Play(States { bar, ball, blocks })
 }

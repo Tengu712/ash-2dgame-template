@@ -20,7 +20,7 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
     }
 
     if istates.get(Key::Return) == 1 {
-        return game::update(game::init(), istates, effects);
+        return play::update(play::init(), istates, effects);
     }
 
     effects.push(Effect::Draw {

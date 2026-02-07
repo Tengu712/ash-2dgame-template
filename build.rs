@@ -42,7 +42,7 @@ fn main() {
         "-DVVL=ON",
         &cargo_build_path,
         "-P",
-        &INSTALL_DEPS_CMAKE,
+        INSTALL_DEPS_CMAKE,
     ];
     run("cmake", &args);
 
