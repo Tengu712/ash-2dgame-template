@@ -1,6 +1,5 @@
-use crate::logs::LoggableResult;
-
 use super::{super::context::Context, update, utils};
+use crate::logs::*;
 use ash::{Device, vk};
 use std::{marker::PhantomData, ptr};
 
@@ -70,6 +69,12 @@ impl TextureMapping {
 
 impl TextureMapping {
     pub fn update(&self, ctx: &Context, image_view: vk::ImageView, offset: u32) {
+        if offset >= MAX_IMAGE_COUNT {
+            dbg_warn_println(&format!(
+                "tried to update texture at invalid index {offset}"
+            ));
+            return;
+        }
         update::update_descriptor_sets(
             &ctx.device,
             &[update::Info::from_image_view(

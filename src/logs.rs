@@ -40,6 +40,12 @@ pub fn panic_log(message: &str) -> ! {
 
 pub fn warn(message: &str) {
     let _ = append_log(message, "WARN");
+    dbg_warn_println(message);
+}
+
+pub fn dbg_warn_println(message: &str) {
+    #[cfg(debug_assertions)]
+    eprintln!("[ WARN ] {message}");
 }
 
 fn append_log(message: &str, category: &str) -> Result<(), ()> {
