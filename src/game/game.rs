@@ -1,4 +1,5 @@
 use super::*;
+use crate::res::*;
 use glam::{Vec2, Vec3, Vec4};
 use std::f32::consts::{FRAC_PI_4, PI};
 
@@ -150,12 +151,14 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
         position: Vec3::new(bar.x, BAR_Y, 0.0),
         scaling: Vec2::new(BAR_SIZE.x, BAR_SIZE.y),
         color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+        uv: UV_WHITE,
     });
     // ボール
     effects.push(Effect::Draw {
         position: Vec3::new(ball.pos.x, ball.pos.y, 0.0),
         scaling: Vec2::new(BALL_SIZE.x, BALL_SIZE.y),
         color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+        uv: UV_CIRCLE,
     });
     // ブロック
     blocks.iter().filter(|block| block.alive).for_each(|block| {
@@ -163,6 +166,7 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
             position: Vec3::new(block.pos.x, block.pos.y, 0.0),
             scaling: Vec2::new(BLOCK_SIZE.x, BLOCK_SIZE.y),
             color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+            uv: UV_WHITE,
         })
     });
 

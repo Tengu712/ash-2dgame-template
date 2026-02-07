@@ -1,6 +1,6 @@
 use super::*;
-use crate::res::IMAGE;
-use glam::Vec3;
+use crate::res::*;
+use glam::{Vec2, Vec3, Vec4};
 
 pub struct States {
     count: usize,
@@ -22,6 +22,13 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
     if istates.get(Key::Return) == 1 {
         return game::update(game::init(), istates, effects);
     }
+
+    effects.push(Effect::Draw {
+        position: Vec3::new(VIRTUAL_WIDTH_HALF, VIRTUAL_HEIGHT_HALF - 50.0, 0.0),
+        scaling: Vec2::new(512.0, 64.0),
+        color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+        uv: UV_TITLE,
+    });
 
     GameState::Title(States {
         count: states.count + 1,

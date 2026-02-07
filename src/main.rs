@@ -25,6 +25,7 @@ enum Effect {
         position: Vec3,
         scaling: Vec2,
         color: Vec4,
+        uv: Vec4,
     },
     LoadImage(Resource),
     UpdateCamera {
@@ -70,10 +71,12 @@ fn main() {
                     position,
                     scaling,
                     color,
+                    uv,
                 } => instances.push(Instance {
                     transform: Mat4::from_translation(position)
                         * Mat4::from_scale(scaling.extend(1.0)),
                     color,
+                    uv,
                 }),
                 Effect::LoadImage(res) => gengine = gengine.load_image(&res),
                 Effect::UpdateCamera { position, scaling } => {
@@ -86,7 +89,8 @@ fn main() {
         }
 
         // 描画
-        gengine = gengine.draw_frame(&window, &instances, &camera);
+        // TODO: イメージディスクリプタセットの更新を効率化
+        gengine = gengine.draw_frame(&window, &instances, &camera, IMAGE);
 
         // 60FPS制限
         frame_start = sync_60fps(frame_start);

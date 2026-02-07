@@ -8,10 +8,7 @@ pub enum Image {
         memory: vk::DeviceMemory,
         view: vk::ImageView,
     },
-    Wrapped {
-        image: vk::Image,
-        view: vk::ImageView,
-    },
+    Wrapped(vk::ImageView),
 }
 
 impl Image {
@@ -43,10 +40,7 @@ impl Image {
         format: vk::Format,
         aspect: vk::ImageAspectFlags,
     ) -> Self {
-        Self::Wrapped {
-            image,
-            view: create_image_view(&ctx.device, image, format, aspect),
-        }
+        Self::Wrapped(create_image_view(&ctx.device, image, format, aspect))
     }
 
     pub fn destroy(self, ctx: &Context) {
@@ -60,7 +54,7 @@ impl Image {
                 ctx.device.free_memory(memory, None);
                 ctx.device.destroy_image(image, None);
             },
-            Self::Wrapped { view, .. } => unsafe {
+            Self::Wrapped(view) => unsafe {
                 ctx.device.destroy_image_view(view, None);
             },
         }
@@ -71,7 +65,7 @@ impl Image {
     pub fn view(&self) -> vk::ImageView {
         match self {
             Self::Owned { view, .. } => *view,
-            Self::Wrapped { view, .. } => *view,
+            Self::Wrapped(view) => *view,
         }
     }
 }

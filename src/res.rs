@@ -3,6 +3,7 @@
 //! NOTE: バイナリサイズが気になったり、暗号化したかったりしたら、
 //!       この方式だとまずい。
 
+use glam::Vec4;
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Copy)]
@@ -22,7 +23,11 @@ impl PartialEq for Resource {
 
 impl Eq for Resource {}
 
-pub const IMAGE: Resource = Resource(include_bytes!(concat!(
+pub static IMAGE: Resource = Resource(include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/res/image.png"
 )));
+
+pub const UV_WHITE: Vec4 = Vec4::new(0.99, 0.99, 0.01, 0.01);
+pub const UV_CIRCLE: Vec4 = Vec4::new(0.0, 0.5, 0.125, 0.5);
+pub const UV_TITLE: Vec4 = Vec4::new(0.0, 0.0, 1.0, 0.5);

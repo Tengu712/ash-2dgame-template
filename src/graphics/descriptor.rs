@@ -1,29 +1,41 @@
 use super::context::Context;
 use crate::logs::*;
 use ash::{Device, vk};
-use std::slice;
 
+pub mod texture;
 pub mod transform;
-mod writer;
+mod update;
+mod utils;
 
-use transform::*;
+use texture::TextureMapping;
+use transform::Transformation;
 
-const MAX_INSTANCE_COUNT: usize = 32;
+/// ディスクリプタセットの最大個数
+///
+/// NOTE: ゲームに応じて適切に設定すべし。
+///       基本的にはディスクリプタセットの種類数と同じで良いが、
+///       ディスクリプタセットを切り替えようとしたら変わる。
+const MAX_DESC_SET_COUNT: u32 = 2;
+const ALL_BINDINGS: &[&[vk::DescriptorSetLayoutBinding]] =
+    &[transform::BINDINGS, texture::BINDINGS];
 
 pub struct Descriptors {
     pub pool: vk::DescriptorPool,
     pub trans: Transformation,
+    pub tex: TextureMapping,
 }
 
 impl Descriptors {
     pub fn new(ctx: &Context) -> Self {
         let pool = create_descriptor_pool(&ctx.device);
-        let trans = Transformation::new(ctx, pool, MAX_INSTANCE_COUNT);
-        Self { pool, trans }
+        let trans = Transformation::new(ctx, pool);
+        let tex = TextureMapping::new(ctx, pool);
+        Self { pool, trans, tex }
     }
 
     pub fn destroy(self, ctx: &Context) {
         unsafe {
+            self.tex.destroy(ctx);
             self.trans.destroy(ctx);
             ctx.device.destroy_descriptor_pool(self.pool, None);
         }
@@ -32,20 +44,7 @@ impl Descriptors {
 
 impl Descriptors {
     pub fn collect_set_layouts(&self) -> Vec<vk::DescriptorSetLayout> {
-        vec![self.trans.layout]
-    }
-
-    pub fn upload(&self, ctx: &Context, instances: &[Instance], camera: &Option<Camera>) {
-        if !instances.is_empty() {
-            self.trans.insts_buffer.copy_to_memory(
-                ctx,
-                &instances[..instances.len().min(MAX_INSTANCE_COUNT)],
-                0,
-            );
-        }
-        if let Some(camera) = camera {
-            self.trans.camera_buffer.copy_to_memory(ctx, camera);
-        }
+        vec![self.trans.layout, self.tex.layout]
     }
 
     pub fn record_bind_command(
@@ -60,7 +59,7 @@ impl Descriptors {
                 vk::PipelineBindPoint::GRAPHICS,
                 pipeline_layout,
                 0,
-                &[self.trans.set],
+                &[self.trans.set, self.tex.set],
                 &[],
             );
         }
@@ -68,19 +67,11 @@ impl Descriptors {
 }
 
 fn create_descriptor_pool(device: &Device) -> vk::DescriptorPool {
-    let pool_sizes = [
-        vk::DescriptorType::UNIFORM_BUFFER,
-        vk::DescriptorType::STORAGE_BUFFER,
-    ]
-    .iter()
-    .map(|&ty| vk::DescriptorPoolSize {
-        ty,
-        descriptor_count: count_descriptor_type(transform::BINDINGS, ty),
-    })
-    .collect::<Vec<_>>();
+    const POOL_SIZES: &[vk::DescriptorPoolSize] = &collect_pool_sizes();
+
     let ci = vk::DescriptorPoolCreateInfo::default()
-        .max_sets(1)
-        .pool_sizes(&pool_sizes);
+        .max_sets(MAX_DESC_SET_COUNT)
+        .pool_sizes(POOL_SIZES);
     unsafe {
         device
             .create_descriptor_pool(&ci, None)
@@ -88,45 +79,36 @@ fn create_descriptor_pool(device: &Device) -> vk::DescriptorPool {
     }
 }
 
-fn count_descriptor_type(
-    bindings: &[vk::DescriptorSetLayoutBinding],
-    descriptor_type: vk::DescriptorType,
-) -> u32 {
-    bindings
-        .iter()
-        .filter(|b| b.descriptor_type == descriptor_type)
-        .map(|b| b.descriptor_count)
-        .sum()
-}
-
-fn create_descriptor_set_layout(
-    device: &Device,
-    bindings: &[vk::DescriptorSetLayoutBinding],
-) -> vk::DescriptorSetLayout {
-    let ci = vk::DescriptorSetLayoutCreateInfo::default().bindings(bindings);
-    unsafe {
-        device
-            .create_descriptor_set_layout(&ci, None)
-            .expect_log("failed to create a descriptor set layout")
+const fn collect_pool_sizes() -> [vk::DescriptorPoolSize; 4] {
+    const fn count(ty: vk::DescriptorType) -> u32 {
+        let mut sum = 0;
+        let mut i = 0;
+        while i < ALL_BINDINGS.len() {
+            let mut j = 0;
+            while j < ALL_BINDINGS[i].len() {
+                if ALL_BINDINGS[i][j].descriptor_type.as_raw() == ty.as_raw() {
+                    sum += ALL_BINDINGS[i][j].descriptor_count;
+                }
+                j += 1;
+            }
+            i += 1;
+        }
+        sum
     }
-}
 
-fn allocate_descriptor_set(
-    device: &Device,
-    pool: vk::DescriptorPool,
-    layout: vk::DescriptorSetLayout,
-) -> vk::DescriptorSet {
-    let ai = vk::DescriptorSetAllocateInfo::default()
-        .descriptor_pool(pool)
-        .set_layouts(slice::from_ref(&layout));
-    let sets = unsafe {
-        device
-            .allocate_descriptor_sets(&ai)
-            .expect_log("failed to allocate a descriptor set")
-    };
-    if sets.is_empty() {
-        panic_log("failed to allocate a descriptor set");
-    } else {
-        sets[0]
+    macro_rules! pool_size_of {
+        ($ty:expr) => {
+            vk::DescriptorPoolSize {
+                ty: $ty,
+                descriptor_count: count($ty),
+            }
+        };
     }
+
+    [
+        pool_size_of!(vk::DescriptorType::UNIFORM_BUFFER),
+        pool_size_of!(vk::DescriptorType::STORAGE_BUFFER),
+        pool_size_of!(vk::DescriptorType::SAMPLED_IMAGE),
+        pool_size_of!(vk::DescriptorType::SAMPLER),
+    ]
 }

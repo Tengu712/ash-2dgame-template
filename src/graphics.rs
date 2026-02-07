@@ -100,6 +100,7 @@ impl GraphicsEngine {
         window: &Window,
         instances: &[Instance],
         camera: &Option<Camera>,
+        image: Resource, // TODO:
     ) -> Self {
         // 準備
         let semaphores = self.synchronizer.current();
@@ -120,7 +121,10 @@ impl GraphicsEngine {
         let submitter = self.submitter.wait(&self.ctx);
 
         // ディスクリプタ更新
-        self.descriptors.upload(&self.ctx, instances, camera);
+        self.descriptors.trans.upload(&self.ctx, instances, camera);
+        if let Some(image) = self.images.get(&image) {
+            self.descriptors.tex.update(&self.ctx, image.view());
+        }
 
         // 記録
         let recorder = submitter.start(&self.ctx);
