@@ -4,6 +4,7 @@ use std::{
     process::{Command, Stdio},
 };
 
+const INSTALL_DEPS_CMAKE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/install_deps.cmake");
 const DEPS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/deps");
 const VULKAN: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -40,7 +41,8 @@ fn main() {
         #[cfg(all(debug_assertions, feature = "vvl"))]
         "-DVVL=ON",
         &cargo_build_path,
-        "-Pdeps/install_deps.cmake",
+        "-P",
+        &INSTALL_DEPS_CMAKE,
     ];
     run("cmake", &args);
 

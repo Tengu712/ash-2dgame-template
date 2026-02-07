@@ -12,10 +12,14 @@ endif()
 # 便利定数を定義
 set(VK_VER_SHORT "1.4.335")
 set(VK_VER       "vulkan-sdk-${VK_VER_SHORT}.0")
+set(DEPS_DIR     "${CMAKE_CURRENT_LIST_DIR}/deps")
+
+# 取り敢えずdepsディレクトリを作成
+file(MAKE_DIRECTORY "${DEPS_DIR}")
 
 # 外部コマンド実行マクロ
 #
-# 最後の引数に実行ディレクトリとしてCMAKE_CURRENT_LIST_DIRからの相対パスを与える。
+# 最後の引数に実行ディレクトリとしてDEPS_DIRからの相対パスを与える。
 macro(run)
 	set(run_args ${ARGV})
 	list(GET       run_args -1 wd)
@@ -24,7 +28,7 @@ macro(run)
 
 	execute_process(
 		COMMAND           ${cmd}
-		WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/${wd}"
+		WORKING_DIRECTORY "${DEPS_DIR}/${wd}"
 		RESULT_VARIABLE   res
 	)
 	if(NOT ${res} EQUAL 0)
@@ -41,14 +45,14 @@ function(install_dep)
 	list(GET       args 0 name)
 	list(REMOVE_AT args 0)
 
-	set(${name}_SOURCE_DIR  "${CMAKE_CURRENT_LIST_DIR}/${name}-${VK_VER}"         PARENT_SCOPE)
-	set(${name}_INSTALL_DIR "${CMAKE_CURRENT_LIST_DIR}/${name}-${VK_VER}/install" PARENT_SCOPE)
+	set(${name}_SOURCE_DIR  "${DEPS_DIR}/${name}-${VK_VER}"         PARENT_SCOPE)
+	set(${name}_INSTALL_DIR "${DEPS_DIR}/${name}-${VK_VER}/install" PARENT_SCOPE)
 
-	if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/${name}-${VK_VER}/install/.stamp")
+	if(EXISTS "${DEPS_DIR}/${name}-${VK_VER}/install/.stamp")
 		return()
 	endif()
 
-	if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/${name}-${VK_VER}")
+	if(NOT EXISTS "${DEPS_DIR}/${name}-${VK_VER}")
 		run(curl -4 -L -O https://github.com/KhronosGroup/${name}/archive/refs/tags/${VK_VER}.tar.gz ".")
 		run(tar xzf ${VK_VER}.tar.gz                                                                 ".")
 	endif()
@@ -57,8 +61,8 @@ function(install_dep)
 	run(cmake --build   build                                                                   ${name}-${VK_VER})
 	run(cmake --install build                                                                   ${name}-${VK_VER})
 
-	file(TOUCH  "${CMAKE_CURRENT_LIST_DIR}/${name}-${VK_VER}/install/.stamp")
-	file(REMOVE "${CMAKE_CURRENT_LIST_DIR}/${VK_VER}.tar.gz")
+	file(TOUCH  "${DEPS_DIR}/${name}-${VK_VER}/install/.stamp")
+	file(REMOVE "${DEPS_DIR}/${VK_VER}.tar.gz")
 endfunction()
 
 # 必須Vulkanライブラリをインストール
@@ -118,11 +122,11 @@ if(VVL)
 		set(lib  "${Vulkan-ValidationLayers_INSTALL_DIR}/lib/${name}")
 		set(json "${Vulkan-ValidationLayers_INSTALL_DIR}/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json")
 	endif()
-	if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/${name}")
-		file(COPY "${lib}"  DESTINATION "${CMAKE_CURRENT_LIST_DIR}")
+	if(NOT EXISTS "${DEPS_DIR}/${name}")
+		file(COPY "${lib}"  DESTINATION "${DEPS_DIR}")
 	endif()
-	if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/VkLayer_khronos_validation.json")
-		file(COPY "${json}" DESTINATION "${CMAKE_CURRENT_LIST_DIR}")
+	if(NOT EXISTS "${DEPS_DIR}/VkLayer_khronos_validation.json")
+		file(COPY "${json}" DESTINATION "${DEPS_DIR}")
 	endif()
 endif()
 
@@ -135,16 +139,16 @@ if(APPLE)
 		message(FATAL_ERROR "CARGO_BUILD_PATH not defined.")
 	endif()
 
-	if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/MoltenVK")
+	if(NOT EXISTS "${DEPS_DIR}/MoltenVK")
 		run(curl -4 -L -O https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.1/MoltenVK-macos.tar ".")
 		run(tar xf MoltenVK-macos.tar                                                                          ".")
 	endif()
 
 	if(NOT EXISTS "${CARGO_BUILD_PATH}/libMoltenVK.dylib")
-		file(COPY "${CMAKE_CURRENT_LIST_DIR}/MoltenVK/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib" DESTINATION "${CARGO_BUILD_PATH}")
+		file(COPY "${DEPS_DIR}/MoltenVK/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib" DESTINATION "${CARGO_BUILD_PATH}")
 	endif()
 	if(NOT EXISTS "${CARGO_BUILD_PATH}/MoltenVK_icd.json")
-		file(COPY "${CMAKE_CURRENT_LIST_DIR}/MoltenVK/MoltenVK/dynamic/dylib/macOS/MoltenVK_icd.json" DESTINATION "${CARGO_BUILD_PATH}")
+		file(COPY "${DEPS_DIR}/MoltenVK/MoltenVK/dynamic/dylib/macOS/MoltenVK_icd.json" DESTINATION "${CARGO_BUILD_PATH}")
 	endif()
 
 	if(NOT EXISTS "${CARGO_BUILD_PATH}/libvulkan.1.dylib")
@@ -154,10 +158,10 @@ if(APPLE)
 endif()
 
 # ウィンドウライブラリをビルド
-if(WIN32 AND NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/window.lib")
-	run("${CMAKE_CURRENT_LIST_DIR}/../window/windows/build.bat" ".")
-elseif(APPLE AND NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/libwindow.a")
-	run("${CMAKE_CURRENT_LIST_DIR}/../window/macos/build.sh" ".")
-elseif(UNIX AND NOT APPLE AND NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/libwindow.a")
-	run("${CMAKE_CURRENT_LIST_DIR}/../window/linux/build.sh" ".")
+if(WIN32 AND NOT EXISTS "${DEPS_DIR}/window.lib")
+	run("${DEPS_DIR}/../window/windows/build.bat" ".")
+elseif(APPLE AND NOT EXISTS "${DEPS_DIR}/libwindow.a")
+	run("${DEPS_DIR}/../window/macos/build.sh" ".")
+elseif(UNIX AND NOT APPLE AND NOT EXISTS "${DEPS_DIR}/libwindow.a")
+	run("${DEPS_DIR}/../window/linux/build.sh" ".")
 endif()
