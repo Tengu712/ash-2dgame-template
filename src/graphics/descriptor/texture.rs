@@ -4,6 +4,11 @@ use super::{super::context::Context, update, utils};
 use ash::{Device, vk};
 use std::{marker::PhantomData, ptr};
 
+/// イメージディスクリプタの配列長
+///
+/// NOTE: 必ずシェーダ側と同期すること。
+const MAX_IMAGE_COUNT: u32 = 1;
+
 /// このディスクリプタセットにおけるバインディング
 ///
 /// NOTE: 必ずシェーダ側と同期すること。
@@ -12,7 +17,7 @@ pub(super) const BINDINGS: &[vk::DescriptorSetLayoutBinding] = &[
     vk::DescriptorSetLayoutBinding {
         binding: 0,
         descriptor_type: vk::DescriptorType::SAMPLED_IMAGE,
-        descriptor_count: 1,
+        descriptor_count: MAX_IMAGE_COUNT,
         stage_flags: vk::ShaderStageFlags::FRAGMENT,
         p_immutable_samplers: ptr::null(),
         _marker: PhantomData,
@@ -45,7 +50,7 @@ impl TextureMapping {
 
         update::update_descriptor_sets(
             &ctx.device,
-            &[update::Info::from_sampler(&[sampler], set, &BINDINGS[1])],
+            &[update::Info::from_sampler(&[sampler], set, &BINDINGS[1], 0)],
         );
 
         Self {
@@ -64,13 +69,14 @@ impl TextureMapping {
 }
 
 impl TextureMapping {
-    pub fn update(&self, ctx: &Context, image_view: vk::ImageView) {
+    pub fn update(&self, ctx: &Context, image_view: vk::ImageView, offset: u32) {
         update::update_descriptor_sets(
             &ctx.device,
             &[update::Info::from_image_view(
                 &[image_view],
                 self.set,
                 &BINDINGS[0],
+                offset,
             )],
         );
     }

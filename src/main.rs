@@ -89,8 +89,7 @@ fn main() {
         }
 
         // 描画
-        // TODO: イメージディスクリプタセットの更新を効率化
-        gengine = gengine.draw_frame(&window, &instances, &camera, IMAGE);
+        gengine = gengine.draw_frame(&window, &instances, &camera, &[(IMAGE, 0)]);
 
         // 60FPS制限
         frame_start = sync_60fps(frame_start);

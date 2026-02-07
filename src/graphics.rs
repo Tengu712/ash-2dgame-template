@@ -95,12 +95,18 @@ impl GraphicsEngine {
         }
     }
 
+    /// 描画関数
+    ///
+    /// * window - ウィンドウ。ウィンドウサイズ変化時のスワップチェーンイメージ再作成に必要。
+    /// * instances - 描画するインスタンスデータ列。
+    /// * camera - カメラデータ。Noneであればアップロードされない。
+    /// * images - 更新するイメージディスクリプタ情報列。組(リソースID, ディスクリプタオフセット)。未ロードイメージはスキップされる。
     pub fn draw_frame(
         mut self,
         window: &Window,
         instances: &[Instance],
         camera: &Option<Camera>,
-        image: Resource, // TODO:
+        images: &[(Resource, u32)],
     ) -> Self {
         // 準備
         let semaphores = self.synchronizer.current();
@@ -122,8 +128,12 @@ impl GraphicsEngine {
 
         // ディスクリプタ更新
         self.descriptors.trans.upload(&self.ctx, instances, camera);
-        if let Some(image) = self.images.get(&image) {
-            self.descriptors.tex.update(&self.ctx, image.view());
+        for (image, offset) in images {
+            if let Some(image) = self.images.get(image) {
+                self.descriptors
+                    .tex
+                    .update(&self.ctx, image.view(), *offset);
+            }
         }
 
         // 記録

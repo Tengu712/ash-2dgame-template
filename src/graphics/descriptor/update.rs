@@ -6,6 +6,7 @@ pub struct InfoBase<T> {
     pub binding: u32,
     pub count: u32,
     pub ty: vk::DescriptorType,
+    pub offset: u32,
 }
 
 impl<T> InfoBase<T> {
@@ -15,6 +16,7 @@ impl<T> InfoBase<T> {
             .dst_binding(self.binding)
             .descriptor_count(self.count)
             .descriptor_type(self.ty)
+            .dst_array_element(self.offset)
     }
 }
 
@@ -46,6 +48,7 @@ macro_rules! define_info_from {
                 values: &[vk::$ty],
                 set: vk::DescriptorSet,
                 binding: &vk::DescriptorSetLayoutBinding,
+                offset: u32,
             ) -> Self {
                 Self::$ty(InfoBase {
                     info: values.iter().map(|$value| $info).collect(),
@@ -53,6 +56,7 @@ macro_rules! define_info_from {
                     binding: binding.binding,
                     count: binding.descriptor_count,
                     ty: binding.descriptor_type,
+                    offset,
                 })
             }
         }

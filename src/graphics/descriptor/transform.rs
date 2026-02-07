@@ -77,8 +77,8 @@ impl Transformation {
         update::update_descriptor_sets(
             &ctx.device,
             &[
-                update::Info::from_buffer(&[insts_buffer.buffer], set, &BINDINGS[0]),
-                update::Info::from_buffer(&[camera_buffer.buffer], set, &BINDINGS[1]),
+                update::Info::from_buffer(&[insts_buffer.buffer], set, &BINDINGS[0], 0),
+                update::Info::from_buffer(&[camera_buffer.buffer], set, &BINDINGS[1], 0),
             ],
         );
 
