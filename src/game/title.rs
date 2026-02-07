@@ -27,6 +27,7 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
         position: Vec3::new(VIRTUAL_WIDTH_HALF, VIRTUAL_HEIGHT_HALF - 50.0, 0.0),
         scaling: Vec2::new(512.0, 64.0),
         color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+        image: IMAGE,
         uv: UV_TITLE,
     });
 

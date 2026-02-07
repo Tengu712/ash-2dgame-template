@@ -4,6 +4,7 @@ use std::{
 };
 
 mod config;
+mod effect;
 mod game;
 mod graphics;
 mod logs;
@@ -11,94 +12,66 @@ mod res;
 mod window;
 
 use config::*;
+use effect::{Effect, EffectProcessor};
 use game::GameState;
-use glam::*;
-use graphics::{GraphicsEngine, descriptor::transform::*};
-use res::*;
+use graphics::GraphicsEngine;
 use window::{
     Window,
     input::{InputStates, Key},
 };
 
-enum Effect {
-    Draw {
-        position: Vec3,
-        scaling: Vec2,
-        color: Vec4,
-        uv: Vec4,
-    },
-    LoadImage(Resource),
-    UpdateCamera {
-        position: Vec3,
-        scaling: Vec3,
-    },
+struct System {
+    window: Window,
+    gengine: GraphicsEngine,
+}
+
+impl System {
+    pub fn new() -> Self {
+        let window = Window::new("ash-2dgame-template", SCREEN_WIDTH, SCREEN_HEIGHT);
+        let gengine = GraphicsEngine::new(&window);
+        Self { window, gengine }
+    }
+
+    pub fn destroy(self) {
+        self.gengine.destroy();
+        self.window.destroy();
+    }
 }
 
 fn main() {
     #[cfg(target_os = "macos")]
     set_env_for_molten_vk();
 
-    let window = Window::new("ash-2dgame-template", SCREEN_WIDTH, SCREEN_HEIGHT);
-    let mut gengine = GraphicsEngine::new(&window);
+    let mut system = System::new();
     let mut istates = InputStates::default();
     let mut gstate = GameState::default();
+    let mut processor = EffectProcessor::new();
+    let mut effects = Vec::new();
     let mut frame_start = Instant::now();
 
-    // NOTE: パフォーマンスのための可変変数
-    let mut effects_buf = Vec::new();
-    let mut instances = Vec::new();
+    while system.window.process_events() {
+        // 初期化
+        effects.clear();
 
-    while window.process_events() {
         // 入力状態更新
-        istates = istates.update(&window);
+        istates = istates.update(&system.window);
 
         // フルスクリーン/ウィンドウ切替え
         if istates.get(Key::Menu) > 0 && istates.get(Key::Return) == 1 {
-            gengine = gengine.ensure_idle();
-            window.toggle_fullscreen();
-            gengine = gengine.recreate_swapchain(&window);
+            effects.push(Effect::ToggleFullscreen);
         }
 
         // ゲーム状態更新
-        gstate = gstate.update(&istates, &mut effects_buf);
+        gstate = gstate.update(&istates, &mut effects);
 
         // 副作用処理
-        let mut camera = None;
-        instances.clear();
-        for effect in effects_buf.drain(..) {
-            match effect {
-                Effect::Draw {
-                    position,
-                    scaling,
-                    color,
-                    uv,
-                } => instances.push(Instance {
-                    transform: Mat4::from_translation(position)
-                        * Mat4::from_scale(scaling.extend(1.0)),
-                    color,
-                    // TODO:
-                    tex_id: 0,
-                    uv,
-                }),
-                Effect::LoadImage(res) => gengine = gengine.load_image(&res),
-                Effect::UpdateCamera { position, scaling } => {
-                    camera = Some(Camera {
-                        view: Mat4::from_translation(-position),
-                        proj: Mat4::from_scale(scaling.recip()),
-                    })
-                }
-            }
-        }
-
-        // 描画
-        gengine = gengine.draw_frame(&window, &instances, &camera, &[(IMAGE, 0)]);
+        (processor, system) = processor.process(&effects, system);
 
         // 60FPS制限
         frame_start = sync_60fps(frame_start);
     }
 
-    gengine.destroy();
-    window.destroy();
+    system.destroy();
 }
 
 #[cfg(target_os = "macos")]
