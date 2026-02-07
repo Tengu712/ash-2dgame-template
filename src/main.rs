@@ -76,6 +76,8 @@ fn main() {
                     transform: Mat4::from_translation(position)
                         * Mat4::from_scale(scaling.extend(1.0)),
                     color,
+                    // TODO:
+                    tex_id: 0,
                     uv,
                 }),
                 Effect::LoadImage(res) => gengine = gengine.load_image(&res),

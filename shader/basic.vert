@@ -3,6 +3,7 @@
 struct Instance {
 	mat4 transform;
 	vec4 color;
+	uint texId;
 	/// 拡張UV座標 (left, top, width, height)
 	vec4 uv;
 };
@@ -16,8 +17,9 @@ layout(set = 0, binding = 1) uniform Camera {
 	mat4 proj;
 } camera;
 
-layout(location = 0) out vec2 outUV;
-layout(location = 1) out vec4 outColor;
+layout(location = 0) out flat uint outTexId;
+layout(location = 1) out vec2 outUV;
+layout(location = 2) out vec4 outColor;
 
 /// 四角形を描画するバーテックスシェーダ
 ///
@@ -27,6 +29,7 @@ layout(location = 1) out vec4 outColor;
 ///       必ず`ash::Device::draw()`を用い、かつ第2引数(`vertex_count`)に`4`を指定すること。
 void main() {
 	vec2 uv = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2) / 2.0;
+	outTexId = instances[gl_InstanceIndex].texId;
 	outUV    = instances[gl_InstanceIndex].uv.xy + uv * instances[gl_InstanceIndex].uv.zw;
 	outColor = instances[gl_InstanceIndex].color;
 	gl_Position = camera.proj

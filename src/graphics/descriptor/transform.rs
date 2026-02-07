@@ -44,6 +44,7 @@ pub(super) const BINDINGS: &[vk::DescriptorSetLayoutBinding] = &[
 pub struct Instance {
     pub transform: Mat4,
     pub color: Vec4,
+    pub tex_id: u32,
     pub uv: Vec4,
 }
 
