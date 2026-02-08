@@ -1,4 +1,8 @@
-use super::super::{context::Context, image::Image, swapchain::Swapchain};
+use super::super::{
+    context::Context,
+    image::{RGBA_COMPONENT_MAP, wrapped::WrappedImage},
+    swapchain::Swapchain,
+};
 use crate::logs::*;
 use ash::{Device, vk};
 
@@ -10,7 +14,7 @@ use ash::{Device, vk};
 ///
 /// WARN: スワップチェーンより短命であること。
 pub struct Framebuffer {
-    pub image: Image,
+    pub image: WrappedImage,
     pub framebuffer: vk::Framebuffer,
     pub clear_colors: Vec<vk::ClearValue>,
 }
@@ -21,10 +25,10 @@ impl Framebuffer {
         render_pass: vk::RenderPass,
         width: u32,
         height: u32,
-        image: Image,
+        image: WrappedImage,
     ) -> Self {
         let framebuffer =
-            create_framebuffer(&ctx.device, render_pass, width, height, &[image.view()]);
+            create_framebuffer(&ctx.device, render_pass, width, height, &[image.view]);
         let clear_colors = vec![vk::ClearValue {
             color: vk::ClearColorValue {
                 float32: [0.0, 0.0, 0.0, 1.0],
@@ -49,11 +53,12 @@ impl Framebuffer {
             .iter()
             .copied()
             .map(|image| {
-                Image::wrap(
+                WrappedImage::from(
                     ctx,
                     image,
                     swapchain.format.format,
                     vk::ImageAspectFlags::COLOR,
+                    RGBA_COMPONENT_MAP,
                 )
             })
             .map(|image| Self::new(ctx, render_pass, width, height, image))

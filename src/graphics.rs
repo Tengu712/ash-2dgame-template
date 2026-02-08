@@ -23,7 +23,7 @@ use descriptor::{
     Descriptors,
     transform::{Camera, Instance},
 };
-use image::*;
+use image::{owned::OwnedImage, *};
 use renderpass::{RenderAreas, RenderPass};
 use submit::{SubmittedSubmitter, Submitter};
 use swapchain::Swapchain;
@@ -76,7 +76,7 @@ pub struct GraphicsEngine {
     submitter: SubmitterState,
 
     submitter_for_image: Submitter,
-    images: HashMap<Resource, Image>,
+    images: HashMap<Resource, OwnedImage>,
 }
 
 impl GraphicsEngine {
@@ -87,20 +87,21 @@ impl GraphicsEngine {
         let render_pass = RenderPass::new(&ctx, &swapchain, &descriptors.collect_set_layouts());
         let synchronizer = Synchronizer::new(&ctx, swapchain.images.len());
         let submitter = SubmitterState::Idle(Submitter::new(&ctx));
-        let submitter_for_image = Submitter::new(&ctx);
+
+        let mut submitter_for_image = Submitter::new(&ctx);
         let mut images = HashMap::new();
-        images.insert(
-            CHAR_ATLAS,
-            Image::new(
-                &ctx,
-                CHAR_ATLAS_SIZE,
-                CHAR_ATLAS_SIZE,
-                CHAR_ATLAS_FORMAT,
-                vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
-                vk::ImageAspectFlags::COLOR,
-                CHAR_ATLAS_COMPONENT_MAP,
-            ),
+        let char_atlas = OwnedImage::new(
+            &ctx,
+            CHAR_ATLAS_SIZE,
+            CHAR_ATLAS_SIZE,
+            CHAR_ATLAS_FORMAT,
+            vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+            vk::ImageAspectFlags::COLOR,
+            CHAR_ATLAS_COMPONENT_MAP,
         );
+        submitter_for_image = init_image(&ctx, submitter_for_image, &char_atlas);
+        images.insert(CHAR_ATLAS, char_atlas);
+
         Self {
             ctx,
             swapchain,
@@ -172,9 +173,7 @@ impl GraphicsEngine {
         self.descriptors.trans.upload(&self.ctx, instances, camera);
         for (image, offset) in images {
             if let Some(image) = self.images.get(image) {
-                self.descriptors
-                    .tex
-                    .update(&self.ctx, image.view(), *offset);
+                self.descriptors.tex.update(&self.ctx, image.view, *offset);
             }
         }
 
@@ -250,7 +249,7 @@ impl GraphicsEngine {
         };
 
         // イメージ作成
-        let image = Image::new(
+        let image = OwnedImage::new(
             &self.ctx,
             width,
             height,
@@ -259,6 +258,7 @@ impl GraphicsEngine {
             vk::ImageAspectFlags::COLOR,
             RGBA_COMPONENT_MAP,
         );
+        self.submitter_for_image = init_image(&self.ctx, self.submitter_for_image, &image);
 
         // アップロード
         self.submitter_for_image = upload_image(
@@ -297,10 +297,22 @@ impl GraphicsEngine {
     }
 }
 
+fn init_image(ctx: &Context, submitter: Submitter, image: &OwnedImage) -> Submitter {
+    let recorder = submitter.start(ctx);
+    image.record_pipeline_barrier_command(
+        ctx,
+        recorder.command_buffer(),
+        vk::ImageLayout::UNDEFINED,
+        vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+    );
+    let waiter = recorder.submit(ctx, &[], &[]);
+    waiter.wait(ctx)
+}
+
 fn upload_image(
     ctx: &Context,
     submitter: Submitter,
-    image: &Image,
+    image: &OwnedImage,
     data: &[u8],
     area: vk::Rect2D,
 ) -> Submitter {
