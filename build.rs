@@ -15,6 +15,22 @@ const GLSLANG: &str = concat!(
     "/deps/glslang-vulkan-sdk-1.4.335.0/install/bin/glslang"
 );
 
+fn print_file_in(dir: &str, exts: &[&str]) {
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            print_file_in(path.to_str().unwrap(), exts);
+            continue;
+        }
+        let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+            continue;
+        };
+        if exts.contains(&ext) {
+            println!("cargo:rerun-if-changed={}", path.display());
+        }
+    }
+}
+
 fn run(command: &str, args: &[&str]) {
     let status = Command::new(command)
         .args(args)
@@ -27,9 +43,9 @@ fn run(command: &str, args: &[&str]) {
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=deps/");
-    println!("cargo:rerun-if-changed=shader/");
-    println!("cargo:rerun-if-changed=window/");
+    println!("cargo:rerun-if-changed=install_deps.cmake");
+    print_file_in("shader", &["vert", "frag"]);
+    print_file_in("window", &["cpp", "hpp", "h", "swift", "sh", "bat"]);
     println!("cargo:rustc-link-search=native={DEPS}");
     println!("cargo:rustc-link-search=native={VULKAN}");
 
