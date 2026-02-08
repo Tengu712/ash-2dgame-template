@@ -77,3 +77,9 @@ func get_input_state(code: UInt16) -> UInt8 {
   ensureInitialized()
   return window?.inputStates[code] == true ? 1 : 0
 }
+
+@_cdecl("get_scale_factor")
+func get_scale_factor() -> Float {
+  ensureInitialized()
+  return Float(window?.window.backingScaleFactor ?? 1.0)
+}

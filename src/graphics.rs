@@ -90,10 +90,14 @@ impl GraphicsEngine {
 
         let mut submitter_for_image = Submitter::new(&ctx);
         let mut images = HashMap::new();
+
+        // NOTE: 特にmacOSでは物理解像度と論理解像度が異なるので、
+        //       それを考慮して文字テクスチャアトラスのサイズをスケールアップさせる。
+        let char_atlas_size = (CHAR_ATLAS_SIZE as f32 * window.get_scale_factor()) as u32;
         let char_atlas = OwnedImage::new(
             &ctx,
-            CHAR_ATLAS_SIZE,
-            CHAR_ATLAS_SIZE,
+            char_atlas_size,
+            char_atlas_size,
             CHAR_ATLAS_FORMAT,
             vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
             vk::ImageAspectFlags::COLOR,

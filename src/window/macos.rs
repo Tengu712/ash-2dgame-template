@@ -77,6 +77,10 @@ impl Window {
     pub fn get_input_state(&self, code: u32) -> bool {
         unsafe { get_input_state(code as u16) != 0 }
     }
+
+    pub fn get_scale_factor(&self) -> f32 {
+        unsafe { get_scale_factor() }
+    }
 }
 
 #[repr(C)]
@@ -96,4 +100,5 @@ unsafe extern "C" {
     fn get_current_client_size() -> WindowSize;
     fn toggle_fullscreen();
     fn get_input_state(code: u16) -> u8;
+    fn get_scale_factor() -> f32;
 }

@@ -79,6 +79,10 @@ impl Window {
     pub fn get_input_state(&self, code: u32) -> bool {
         unsafe { get_input_state(code) != 0 }
     }
+
+    pub fn get_scale_factor(&self) -> f32 {
+        1.0
+    }
 }
 
 #[repr(C)]

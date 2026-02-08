@@ -49,7 +49,6 @@ pub enum Effect {
     },
 }
 
-#[derive(Default)]
 pub struct EffectProcessor {
     /// インスタンスバッファにアップロードされるデータ列
     ///
@@ -65,8 +64,13 @@ pub struct EffectProcessor {
 }
 
 impl EffectProcessor {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(system: &System) -> Self {
+        Self {
+            instances: Default::default(),
+            camera: Default::default(),
+            tex_state: Default::default(),
+            chars_state: CharsManageState::new(system),
+        }
     }
 }
 

@@ -45,14 +45,13 @@ pub struct CharsManageState {
     registereds: CharLruCache,
 }
 
-impl Default for CharsManageState {
-    fn default() -> Self {
+impl CharsManageState {
+    pub fn new(system: &System) -> Self {
+        // NOTE: 物理解像度と論理解像度の違いを考慮してスケールアップ。
+        let atlas_size = (CHAR_ATLAS_SIZE as f32 * system.window.get_scale_factor()) as i32;
         Self {
             font: FontRef::try_from_slice(FONT).expect_log("failed to load a font"),
-            atlas: AtlasAllocator::new(etagere::size2(
-                CHAR_ATLAS_SIZE as i32,
-                CHAR_ATLAS_SIZE as i32,
-            )),
+            atlas: AtlasAllocator::new(etagere::size2(atlas_size, atlas_size)),
             registereds: LruCache::unbounded(),
         }
     }
@@ -72,8 +71,13 @@ impl CharsManageState {
     }
 
     fn register_character(mut self, c: char, scale: u32, mut system: System) -> (Self, System) {
+        let scale_factor = system.window.get_scale_factor();
+
         // ラスタライズ
-        let rasterized = rasterize_character(&self.font, c, scale as f32);
+        //
+        // NOTE: 物理解像度と論理解像度の違いを考慮してスケールアップ。
+        //       scaleをスケールアップすれば自ずとラスタライズ結果も比例してスケールアップされる。
+        let rasterized = rasterize_character(&self.font, c, scale as f32 * scale_factor);
 
         // アロケート
         let size = etagere::size2(rasterized.width as i32, rasterized.height as i32);
@@ -98,24 +102,24 @@ impl CharsManageState {
             rasterized.height,
         );
 
+        // スケールアップとマージンの除去
+        let x = (allocated.rectangle.min.x as f32 + MARGIN as f32) / scale_factor;
+        let y = (allocated.rectangle.min.y as f32 + MARGIN as f32) / scale_factor;
+        let width = (rasterized.width as f32 - MARGIN_AXIS as f32) / scale_factor;
+        let height = (rasterized.height as f32 - MARGIN_AXIS as f32) / scale_factor;
+        let x_offset = rasterized.x_offset / scale_factor;
+        let y_offset = rasterized.y_offset / scale_factor;
+        let advance = rasterized.advance / scale_factor;
+
         // 登録
-        //
-        // NOTE: マージンを除いて計算
-        let width = rasterized.width as f32 - MARGIN_AXIS as f32;
-        let height = rasterized.height as f32 - MARGIN_AXIS as f32;
         let info = CharInfo {
             alloc_id: allocated.id,
             width,
             height,
-            x_offset: rasterized.x_offset,
-            y_offset: rasterized.y_offset,
-            advance: rasterized.advance,
-            uv: Vec4::new(
-                allocated.rectangle.min.x as f32 + MARGIN as f32,
-                allocated.rectangle.min.y as f32 + MARGIN as f32,
-                width,
-                height,
-            ) / CHAR_ATLAS_SIZE as f32,
+            x_offset,
+            y_offset,
+            advance,
+            uv: Vec4::new(x, y, width, height) / CHAR_ATLAS_SIZE as f32,
         };
         self.registereds.push((c, scale), info);
 

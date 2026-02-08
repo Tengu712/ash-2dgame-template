@@ -45,7 +45,7 @@ fn main() {
     let mut system = System::new();
     let mut istates = InputStates::default();
     let mut gstate = GameState::default();
-    let mut processor = EffectProcessor::new();
+    let mut processor = EffectProcessor::new(&system);
     let mut effects = Vec::new();
     let mut frame_start = Instant::now();
 
