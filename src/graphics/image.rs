@@ -1,6 +1,19 @@
-use super::{buffer::ArrayBuffer, context::Context};
+use super::context::Context;
 use crate::logs::*;
 use ash::{Device, vk};
+
+pub const RGBA_COMPONENT_MAP: vk::ComponentMapping = vk::ComponentMapping {
+    r: vk::ComponentSwizzle::R,
+    g: vk::ComponentSwizzle::G,
+    b: vk::ComponentSwizzle::B,
+    a: vk::ComponentSwizzle::A,
+};
+pub const R_COMPONENT_MAP: vk::ComponentMapping = vk::ComponentMapping {
+    r: vk::ComponentSwizzle::ONE,
+    g: vk::ComponentSwizzle::ONE,
+    b: vk::ComponentSwizzle::ONE,
+    a: vk::ComponentSwizzle::R,
+};
 
 pub enum Image {
     Owned {
@@ -19,6 +32,7 @@ impl Image {
         format: vk::Format,
         usage: vk::ImageUsageFlags,
         aspect: vk::ImageAspectFlags,
+        components: vk::ComponentMapping,
     ) -> Self {
         let extent = vk::Extent3D {
             width,
@@ -26,7 +40,7 @@ impl Image {
             depth: 1,
         };
         let (image, memory) = create_image_util(ctx, extent, format, usage);
-        let view = create_image_view(&ctx.device, image, format, aspect);
+        let view = create_image_view(&ctx.device, image, format, aspect, components);
         Self::Owned {
             image,
             memory,
@@ -40,7 +54,13 @@ impl Image {
         format: vk::Format,
         aspect: vk::ImageAspectFlags,
     ) -> Self {
-        Self::Wrapped(create_image_view(&ctx.device, image, format, aspect))
+        Self::Wrapped(create_image_view(
+            &ctx.device,
+            image,
+            format,
+            aspect,
+            RGBA_COMPONENT_MAP,
+        ))
     }
 
     pub fn destroy(self, ctx: &Context) {
@@ -71,18 +91,22 @@ impl Image {
 }
 
 impl Image {
-    /// バッファ上のデータをイメージにアップロードするメソッド
-    pub fn upload(
+    /// イメージにデータをアップロードするコマンドを発行するメソッド
+    ///
+    /// * ctx - コンテキスト
+    /// * command_buffer - アップロードコマンドを追加するコマンドバッファ
+    /// * buffer - ソースとなるバッファ
+    /// * area - アップロード先の範囲
+    pub fn record_upload_command(
         &self,
         ctx: &Context,
         command_buffer: vk::CommandBuffer,
-        staging: &ArrayBuffer<u8>,
-        width: u32,
-        height: u32,
+        buffer: vk::Buffer,
+        area: vk::Rect2D,
     ) {
         match self {
             Self::Owned { image, .. } => {
-                upload_image_data(ctx, command_buffer, staging, width, height, *image);
+                upload_image_data(ctx, command_buffer, buffer, area, *image);
             }
             _ => panic!("Internal error: try to upload data to wrapped image"),
         }
@@ -136,17 +160,13 @@ fn create_image_view(
     image: vk::Image,
     format: vk::Format,
     aspect: vk::ImageAspectFlags,
+    components: vk::ComponentMapping,
 ) -> vk::ImageView {
     let ci = vk::ImageViewCreateInfo::default()
         .image(image)
         .view_type(vk::ImageViewType::TYPE_2D)
         .format(format)
-        .components(vk::ComponentMapping {
-            r: vk::ComponentSwizzle::R,
-            g: vk::ComponentSwizzle::G,
-            b: vk::ComponentSwizzle::B,
-            a: vk::ComponentSwizzle::A,
-        })
+        .components(components)
         .subresource_range(vk::ImageSubresourceRange {
             aspect_mask: aspect,
             base_mip_level: 0,
@@ -164,15 +184,14 @@ fn create_image_view(
 fn upload_image_data(
     ctx: &Context,
     command_buffer: vk::CommandBuffer,
-    staging: &ArrayBuffer<u8>,
-    width: u32,
-    height: u32,
+    buffer: vk::Buffer,
+    area: vk::Rect2D,
     image: vk::Image,
 ) {
     unsafe {
         // イメージレイアウトをTRANSFER_DST_OPTIMALに変更
         let barrier = vk::ImageMemoryBarrier::default()
-            .old_layout(vk::ImageLayout::UNDEFINED)
+            .old_layout(vk::ImageLayout::UNDEFINED) // TODO: SHADER_READ_ONLY_OPTIMALにする。
             .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
             .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
             .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
@@ -207,15 +226,19 @@ fn upload_image_data(
                 base_array_layer: 0,
                 layer_count: 1,
             })
-            .image_offset(vk::Offset3D { x: 0, y: 0, z: 0 })
+            .image_offset(vk::Offset3D {
+                x: area.offset.x,
+                y: area.offset.y,
+                z: 0,
+            })
             .image_extent(vk::Extent3D {
-                width,
-                height,
+                width: area.extent.width,
+                height: area.extent.height,
                 depth: 1,
             });
         ctx.device.cmd_copy_buffer_to_image(
             command_buffer,
-            staging.buffer,
+            buffer,
             image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             &[region],

@@ -23,11 +23,20 @@ impl PartialEq for Resource {
 
 impl Eq for Resource {}
 
+/// 文字テクスチャアトラスを識別するためのダミーリソース
+///
+/// WARN: このリソースからイメージを作成しようとしないこと。
+pub static CHAR_ATLAS: Resource = Resource(&[]);
+
 pub static IMAGE: Resource = Resource(include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/res/image.png"
 )));
-
 pub const UV_WHITE: Vec4 = Vec4::new(0.99, 0.99, 0.01, 0.01);
 pub const UV_CIRCLE: Vec4 = Vec4::new(0.0, 0.5, 0.125, 0.5);
 pub const UV_TITLE: Vec4 = Vec4::new(0.0, 0.0, 1.0, 0.5);
+
+pub static FONT: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/res/OpenSans-Regular.ttf"
+));

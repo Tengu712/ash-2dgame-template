@@ -50,9 +50,6 @@ fn main() {
     let mut frame_start = Instant::now();
 
     while system.window.process_events() {
-        // 初期化
-        effects.clear();
-
         // 入力状態更新
         istates = istates.update(&system.window);
 
@@ -65,7 +62,7 @@ fn main() {
         gstate = gstate.update(&istates, &mut effects);
 
         // 副作用処理
-        (processor, system) = processor.process(&effects, system);
+        (processor, system) = processor.process(effects.drain(..), system);
 
         // 60FPS制限
         frame_start = sync_60fps(frame_start);

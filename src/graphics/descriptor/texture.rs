@@ -6,7 +6,7 @@ use std::{marker::PhantomData, ptr};
 /// イメージディスクリプタの配列長
 ///
 /// NOTE: 必ずシェーダ側と同期すること。
-const MAX_IMAGE_COUNT: u32 = 1;
+const MAX_IMAGE_COUNT: u32 = 2;
 
 /// このディスクリプタセットにおけるバインディング
 ///

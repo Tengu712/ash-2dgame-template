@@ -16,8 +16,14 @@ use crate::{
     res::*,
 };
 use glam::*;
+use std::vec::Drain;
 
-#[derive(Clone, Copy)]
+mod chars;
+mod texture;
+
+use chars::CharsManageState;
+use texture::TextureManageState;
+
 pub enum Effect {
     Draw {
         position: Vec3,
@@ -25,6 +31,15 @@ pub enum Effect {
         color: Vec4,
         image: Resource,
         uv: Vec4,
+    },
+    DrawText {
+        /// emスクエア高 [px]
+        scale: u32,
+        text: String,
+        position: Vec3,
+        /// 1行の見かけの高さ
+        line_height: f32,
+        color: Vec4,
     },
     LoadImage(Resource),
     ToggleFullscreen,
@@ -40,20 +55,13 @@ pub struct EffectProcessor {
     ///
     /// NOTE: なくても構わないがアロケーションコストを抑えるために。
     instances: Vec<Instance>,
+    /// インスタンスバッファにアップロードされるデータ列
+    ///
+    /// NOTE: 本当になくても構わないが型定義が煩雑になるので。
+    camera: Option<Camera>,
 
-    /// 更新すべきイメージディスクリプタの情報列
-    ///
-    /// NOTE: なくても構わないがアロケーションコストを抑えるために。
-    images: Vec<(Resource, u32)>,
-    /// イメージディスクリプタの更新状況
-    ///
-    /// インデックスはディスクリプタのオフセットを表す。
-    updated_images: Vec<Resource>,
-    /// そのフレームで出現したイメージの集合
-    ///
-    /// NOTE: どうせ数種類しかないのでHashSetよりVecの方が高速のはず。
-    /// NOTE: なくても構わないがアロケーションコストを抑えるために。
-    appeared_images: Vec<Resource>,
+    tex_state: TextureManageState,
+    chars_state: CharsManageState,
 }
 
 impl EffectProcessor {
@@ -69,91 +77,97 @@ impl EffectProcessor {
     //       副作用処理用の状態を持つ必要が(パフォーマンスのために)あり、
     //       かつ、処理する副作用と・副作用の適応対象をパラメータとするために、
     //       副作用処理用の状態が優位存在であると考えられるため。
-    pub fn process(mut self, effects: &[Effect], mut system: System) -> (Self, System) {
+    pub fn process(mut self, effects: Drain<'_, Effect>, mut system: System) -> (Self, System) {
         self.instances.clear();
-        self.images.clear();
-        self.appeared_images.clear();
-        let mut camera = None;
+        self.camera = None;
+        self.tex_state = self.tex_state.clear();
 
-        for effect in effects.iter().copied() {
-            match effect {
-                Effect::Draw {
-                    position,
-                    scaling,
+        for effect in effects {
+            (self, system) = self.process_effect(effect, system);
+        }
+
+        system.gengine = system.gengine.draw_frame(
+            &system.window,
+            &self.instances,
+            &self.camera,
+            &self.tex_state.images,
+        );
+        (self, system)
+    }
+
+    fn process_effect(mut self, effect: Effect, mut system: System) -> (Self, System) {
+        match effect {
+            Effect::Draw {
+                position,
+                scaling,
+                color,
+                image,
+                uv,
+            } => {
+                let tex_id;
+                (self.tex_state, tex_id) = self.tex_state.update(image);
+
+                self.instances.push(Instance {
+                    transform: Mat4::from_translation(position)
+                        * Mat4::from_scale(scaling.extend(1.0)),
                     color,
-                    image,
+                    tex_id,
                     uv,
-                } => {
-                    let tex_id =
-                        match find_texture_id(image, &self.updated_images, &self.appeared_images) {
-                            FindTexIdRes::Updated(i) => i,
-                            FindTexIdRes::Overwrite(i) => {
-                                self.images.push((image, i));
-                                self.updated_images[i as usize] = image;
-                                i
-                            }
-                            FindTexIdRes::Push(i) => {
-                                self.images.push((image, i));
-                                self.updated_images.push(image);
-                                i
-                            }
-                        };
-                    self.appeared_images.push(image);
+                });
+            }
 
+            Effect::DrawText {
+                scale,
+                text,
+                position,
+                line_height,
+                color,
+            } => {
+                let tex_id;
+                (self.tex_state, tex_id) = self.tex_state.update(CHAR_ATLAS);
+
+                let mut x = position.x;
+                for c in text.chars() {
+                    // TODO: 複数行に対応する。
+                    // TODO: アラインメントに対応する。
+
+                    let info;
+                    (self.chars_state, info, system) = self.chars_state.update(c, scale, system);
+
+                    let s = line_height / scale as f32;
+                    let pos = Vec3::new(
+                        x + (info.x_offset + info.width / 2.0) * s,
+                        position.y + (info.y_offset + info.height / 2.0) * s,
+                        position.z,
+                    );
+                    let scl = Vec3::new(info.width * s, info.height * s, 1.0);
                     self.instances.push(Instance {
-                        transform: Mat4::from_translation(position)
-                            * Mat4::from_scale(scaling.extend(1.0)),
+                        transform: Mat4::from_translation(pos) * Mat4::from_scale(scl),
                         color,
                         tex_id,
-                        uv,
+                        uv: info.uv,
                     });
-                }
 
-                Effect::LoadImage(res) => system.gengine = system.gengine.load_image(&res),
-
-                Effect::ToggleFullscreen => {
-                    system.gengine = system.gengine.ensure_idle();
-                    system.window.toggle_fullscreen();
-                    system.gengine = system.gengine.recreate_swapchain(&system.window);
+                    x += info.advance * s;
                 }
+            }
 
-                Effect::UpdateCamera { position, scaling } => {
-                    camera = Some(Camera {
-                        view: Mat4::from_translation(-position),
-                        proj: Mat4::from_scale(scaling.recip()),
-                    })
-                }
+            Effect::LoadImage(res) => system.gengine = system.gengine.load_image(&res),
+
+            Effect::ToggleFullscreen => {
+                system.gengine = system.gengine.ensure_idle();
+                system.window.toggle_fullscreen();
+                system.gengine = system.gengine.recreate_swapchain(&system.window);
+            }
+
+            Effect::UpdateCamera { position, scaling } => {
+                self.camera = Some(Camera {
+                    view: Mat4::from_translation(-position),
+                    proj: Mat4::from_scale(scaling.recip()),
+                })
             }
         }
 
-        system.gengine =
-            system
-                .gengine
-                .draw_frame(&system.window, &self.instances, &camera, &self.images);
         (self, system)
-    }
-}
-
-enum FindTexIdRes {
-    Updated(u32),
-    Overwrite(u32),
-    Push(u32),
-}
-
-fn find_texture_id(image: Resource, updateds: &[Resource], appeareds: &[Resource]) -> FindTexIdRes {
-    // 更新済のイメージとして存在する
-    if let Some(i) = updateds.iter().position(|v| v == &image) {
-        FindTexIdRes::Updated(i as u32)
-    }
-    // そうでないなら未出現のスロットを上書きするように
-    else if let Some(i) = updateds
-        .iter()
-        .position(|v| !appeareds.iter().any(|x| x == v))
-    {
-        FindTexIdRes::Overwrite(i as u32)
-    }
-    // それもできないなら追加するしかない
-    else {
-        FindTexIdRes::Push(updateds.len() as u32)
     }
 }

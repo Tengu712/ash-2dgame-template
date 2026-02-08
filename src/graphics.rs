@@ -1,4 +1,9 @@
-use crate::{config::*, logs::*, res::Resource, window::Window};
+use crate::{
+    config::*,
+    logs::*,
+    res::{CHAR_ATLAS, Resource},
+    window::Window,
+};
 use ash::vk;
 use std::collections::HashMap;
 
@@ -18,11 +23,35 @@ use descriptor::{
     Descriptors,
     transform::{Camera, Instance},
 };
-use image::Image;
+use image::*;
 use renderpass::{RenderAreas, RenderPass};
 use submit::{SubmittedSubmitter, Submitter};
 use swapchain::Swapchain;
 use sync::Synchronizer;
+
+/// 文字テクスチャアトラスの一辺の長さ [px]
+pub const CHAR_ATLAS_SIZE: u32 = 512;
+/// 文字テクスチャアトラスのチャンネル数
+//
+// NOTE: macOSではswizzleをゼロコストで使えないので、
+//       文字テクスチャアトラスも4チャンネルにする。
+pub const CHAR_ATLAS_CHANNEL_COUNT: usize = if cfg!(target_os = "macos") { 4 } else { 1 };
+/// 文字テクスチャアトラスのフォーマット
+//
+// NOTE: 上記の理由でmacOSでは普通の画像と同じフォーマット。
+pub const CHAR_ATLAS_FORMAT: vk::Format = if cfg!(target_os = "macos") {
+    vk::Format::R8G8B8A8_SRGB
+} else {
+    vk::Format::R8_UNORM
+};
+/// 文字テクスチャアトラスのチャンネル数
+//
+// NOTE: 上記の理由でmacOSでは普通のコンポーネントマッピング。
+pub const CHAR_ATLAS_COMPONENT_MAP: vk::ComponentMapping = if cfg!(target_os = "macos") {
+    RGBA_COMPONENT_MAP
+} else {
+    R_COMPONENT_MAP
+};
 
 enum SubmitterState {
     Idle(Submitter),
@@ -59,6 +88,19 @@ impl GraphicsEngine {
         let synchronizer = Synchronizer::new(&ctx, swapchain.images.len());
         let submitter = SubmitterState::Idle(Submitter::new(&ctx));
         let submitter_for_image = Submitter::new(&ctx);
+        let mut images = HashMap::new();
+        images.insert(
+            CHAR_ATLAS,
+            Image::new(
+                &ctx,
+                CHAR_ATLAS_SIZE,
+                CHAR_ATLAS_SIZE,
+                CHAR_ATLAS_FORMAT,
+                vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+                vk::ImageAspectFlags::COLOR,
+                CHAR_ATLAS_COMPONENT_MAP,
+            ),
+        );
         Self {
             ctx,
             swapchain,
@@ -67,7 +109,7 @@ impl GraphicsEngine {
             synchronizer,
             submitter,
             submitter_for_image,
-            images: HashMap::new(),
+            images,
         }
     }
 
@@ -215,28 +257,61 @@ impl GraphicsEngine {
             vk::Format::R8G8B8A8_SRGB, // NOTE: ファイルによってはこのフォーマットじゃないかもね
             vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
             vk::ImageAspectFlags::COLOR,
+            RGBA_COMPONENT_MAP,
         );
-
-        // ステージングバッファ作成&アップロード
-        let staging =
-            ArrayBuffer::<u8>::new(&self.ctx, data.len(), vk::BufferUsageFlags::TRANSFER_SRC);
-        staging.copy_to_memory(&self.ctx, &data, 0);
 
         // アップロード
-        let recording = self.submitter_for_image.start(&self.ctx);
-        image.upload(
+        self.submitter_for_image = upload_image(
             &self.ctx,
-            recording.command_buffer(),
-            &staging,
-            width,
-            height,
+            self.submitter_for_image,
+            &image,
+            &data,
+            vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: vk::Extent2D { width, height },
+            },
         );
-        let waiter = recording.submit(&self.ctx, &[], &[]);
-        self.submitter_for_image = waiter.wait(&self.ctx);
 
         // 終了
-        staging.destroy(&self.ctx);
         self.images.insert(*res, image);
         self
     }
+
+    /// 文字テクスチャアトラスにデータをアップロードするメソッド
+    pub fn upload_char(mut self, data: &[u8], x: i32, y: i32, width: u32, height: u32) -> Self {
+        let image = self
+            .images
+            .get(&CHAR_ATLAS)
+            .expect("Internal error: char atlas not found");
+        self.submitter_for_image = upload_image(
+            &self.ctx,
+            self.submitter_for_image,
+            image,
+            data,
+            vk::Rect2D {
+                offset: vk::Offset2D { x, y },
+                extent: vk::Extent2D { width, height },
+            },
+        );
+        self
+    }
+}
+
+fn upload_image(
+    ctx: &Context,
+    submitter: Submitter,
+    image: &Image,
+    data: &[u8],
+    area: vk::Rect2D,
+) -> Submitter {
+    let staging = ArrayBuffer::<u8>::new(ctx, data.len(), vk::BufferUsageFlags::TRANSFER_SRC);
+    staging.copy_to_memory(ctx, data, 0);
+
+    let recording = submitter.start(ctx);
+    image.record_upload_command(ctx, recording.command_buffer(), staging.buffer, area);
+    let waiter = recording.submit(ctx, &[], &[]);
+    let submitter = waiter.wait(ctx);
+
+    staging.destroy(ctx);
+    submitter
 }

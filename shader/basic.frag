@@ -1,6 +1,6 @@
 #version 450
 
-layout(set = 1, binding = 0) uniform texture2D texs[1];
+layout(set = 1, binding = 0) uniform texture2D texs[2];
 layout(set = 1, binding = 1) uniform sampler smplr;
 
 layout(location = 0) in flat uint inTexId;
