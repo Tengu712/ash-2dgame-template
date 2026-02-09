@@ -58,6 +58,22 @@ impl CharsManageState {
 }
 
 impl CharsManageState {
+    /// スケールされたフォントのトップ-ベースライン間を取得するメソッド
+    ///
+    /// WARN: 物理解像度と論理解像度の違いを考慮しない。
+    ///       このメソッドの使い道ゆえ。
+    pub fn ascent(&self, scale: u32) -> f32 {
+        self.font.as_scaled(scale as f32).ascent()
+    }
+
+    /// スケールされたフォントの行間を取得するメソッド
+    ///
+    /// WARN: 物理解像度と論理解像度の違いを考慮しない。
+    ///       このメソッドの使い道ゆえ。
+    pub fn line_gap(&self, scale: u32) -> f32 {
+        self.font.as_scaled(scale as f32).line_gap()
+    }
+
     // NOTE: `scale`は`f32`でしか使われないが、
     //       `f32`は`Hash`を実装していないので`u32`で受け取る。
     pub fn update(mut self, c: char, scale: u32, mut system: System) -> (Self, CharInfo, System) {

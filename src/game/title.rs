@@ -1,5 +1,8 @@
 use super::*;
-use crate::{effect::TextAlignment, res::*};
+use crate::{
+    effect::{TextHorizontalAlignment, TextVerticalAlignment},
+    res::*,
+};
 use glam::{Vec2, Vec3, Vec4};
 
 pub struct States {
@@ -33,7 +36,8 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
     effects.push(Effect::DrawText {
         scale: 32,
         text: "PRESS ENTER KEY TO START".to_string(),
-        align: TextAlignment::Center,
+        halign: TextHorizontalAlignment::Center,
+        valign: TextVerticalAlignment::Center,
         position: Vec3::new(VIRTUAL_WIDTH_HALF, VIRTUAL_HEIGHT_HALF + 50.0, 0.0),
         line_height: 32.0,
         color: Vec4::new(1.0, 1.0, 1.0, 1.0),

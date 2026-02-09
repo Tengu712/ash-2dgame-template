@@ -25,10 +25,59 @@ use chars::CharsManageState;
 use texture::TextureManageState;
 
 #[allow(unused)]
-pub enum TextAlignment {
+pub enum TextHorizontalAlignment {
     Left,
     Center,
     Right,
+}
+
+impl TextHorizontalAlignment {
+    fn align(&self, width: f32, instances: &mut [Instance]) {
+        match self {
+            Self::Left => (),
+            Self::Center => {
+                for instance in instances {
+                    instance.transform.w_axis.x -= width / 2.0;
+                }
+            }
+            Self::Right => {
+                for instance in instances {
+                    instance.transform.w_axis.x -= width;
+                }
+            }
+        }
+    }
+}
+
+#[allow(unused)]
+pub enum TextVerticalAlignment {
+    Top,
+    Center,
+    Bottom,
+}
+
+impl TextVerticalAlignment {
+    fn align(&self, ascent: f32, height: f32, instances: &mut [Instance]) {
+        match self {
+            Self::Top => {
+                for instance in instances {
+                    instance.transform.w_axis.y += ascent;
+                }
+            }
+            Self::Center => {
+                for instance in instances {
+                    instance.transform.w_axis.y += ascent;
+                    instance.transform.w_axis.y -= height / 2.0;
+                }
+            }
+            Self::Bottom => {
+                for instance in instances {
+                    instance.transform.w_axis.y += ascent;
+                    instance.transform.w_axis.y -= height;
+                }
+            }
+        }
+    }
 }
 
 #[allow(unused)]
@@ -44,7 +93,8 @@ pub enum Effect {
         /// emスクエア高 [px]
         scale: u32,
         text: String,
-        align: TextAlignment,
+        halign: TextHorizontalAlignment,
+        valign: TextVerticalAlignment,
         position: Vec3,
         /// 1行の見かけの高さ
         line_height: f32,
@@ -132,7 +182,8 @@ impl EffectProcessor {
             Effect::DrawText {
                 scale,
                 text,
-                align,
+                halign,
+                valign,
                 position,
                 line_height,
                 color,
@@ -140,51 +191,60 @@ impl EffectProcessor {
                 let tex_id;
                 (self.tex_state, tex_id) = self.tex_state.update(CHAR_ATLAS);
 
-                // `position`をペンポイントとして普通にインスタンスデータ構築
-                let mut pen_point = position.xy();
-                let mut max_xy = pen_point;
+                let s = line_height / scale as f32;
+                let ascent = self.chars_state.ascent(scale) * s;
+                let line_gap = self.chars_state.line_gap(scale) * s;
                 let start_i = self.instances.len();
-                let start_x = pen_point.x;
-                for c in text.chars() {
-                    // TODO: 複数行に対応する。
+                let mut pp_y = position.y;
+                let mut line_count = 1;
+                let mut should_end = false;
+                let mut chars = text.chars();
 
-                    let info;
-                    (self.chars_state, info, system) = self.chars_state.update(c, scale, system);
+                // すべての行について
+                while !should_end {
+                    should_end = true;
+                    let start_i = self.instances.len();
+                    let mut pp_x = position.x;
+                    let mut max_x = pp_x;
 
-                    let s = line_height / scale as f32;
-                    let xy = Vec2::new(
-                        pen_point.x + (info.x_offset + info.width / 2.0) * s,
-                        pen_point.y + (info.y_offset + info.height / 2.0) * s,
-                    );
-                    let wh = Vec2::new(info.width * s, info.height * s);
-                    self.instances.push(Instance {
-                        transform: Mat4::from_translation(xy.extend(position.z))
-                            * Mat4::from_scale(wh.extend(1.0)),
-                        color,
-                        tex_id,
-                        uv: info.uv,
-                    });
+                    // 各行のインスタンスデータ構築
+                    for c in &mut chars {
+                        should_end = false;
+                        if c == '\n' {
+                            line_count += 1;
+                            break;
+                        }
 
-                    max_xy = max_xy.max(pen_point + wh);
-                    pen_point.x += info.advance * s;
+                        let info;
+                        (self.chars_state, info, system) =
+                            self.chars_state.update(c, scale, system);
+
+                        let w = info.width * s;
+                        let h = info.height * s;
+                        let x = pp_x + w / 2.0 + info.x_offset * s;
+                        let y = pp_y + h / 2.0 + info.y_offset * s;
+                        self.instances.push(Instance {
+                            transform: Mat4::from_translation(Vec3::new(x, y, position.z))
+                                * Mat4::from_scale(Vec3::new(w, h, 1.0)),
+                            color,
+                            tex_id,
+                            uv: info.uv,
+                        });
+
+                        max_x = x + w / 2.0;
+                        pp_x += info.advance * s;
+                    }
+
+                    // 各行を水平方向にアラインメント
+                    halign.align(max_x - position.x, &mut self.instances[start_i..]);
+
+                    // 改行
+                    pp_y += line_height + line_gap;
                 }
 
-                // アラインメント
-                let cx = (start_x + max_xy.x) / 2.0;
-                let dx = position.x - cx;
-                match align {
-                    TextAlignment::Left => (),
-                    TextAlignment::Center => {
-                        for instance in &mut self.instances[start_i..] {
-                            instance.transform.w_axis.x += dx;
-                        }
-                    }
-                    TextAlignment::Right => {
-                        for instance in &mut self.instances[start_i..] {
-                            instance.transform.w_axis.x += dx * 2.0;
-                        }
-                    }
-                }
+                // すべての文字を垂直方向にアラインメント
+                let height = (line_height + line_gap) * line_count as f32 - line_gap;
+                valign.align(ascent, height, &mut self.instances[start_i..]);
             }
 
             Effect::LoadImage(res) => system.gengine = system.gengine.load_image(&res),
