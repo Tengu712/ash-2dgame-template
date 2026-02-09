@@ -77,6 +77,16 @@ impl Ball {
             angle,
             speed,
         }
+        .clamp_angle()
+    }
+
+    /// ボールが水平方向に行かないように±[10deg, 170deg]にclampする関数
+    fn clamp_angle(self) -> Self {
+        let min = PI / 18.0;
+        let max = PI - min;
+        let normalized = (self.angle + PI).rem_euclid(2.0 * PI) - PI; // [-PI, PI)
+        let angle = normalized.abs().clamp(min, max).copysign(normalized);
+        Self { angle, ..self }
     }
 }
 
@@ -111,10 +121,13 @@ fn collide_ball_blocks(ball: Ball, mut blocks: Vec<Block>) -> (Ball, Vec<Block>)
             None
         }
     });
-    let ball = hit_pos.map_or(ball, |hit_pos| Ball {
-        angle: reflect_radial(ball.pos, hit_pos),
-        speed: ball.speed + 0.1,
-        ..ball
+    let ball = hit_pos.map_or(ball, |hit_pos| {
+        Ball {
+            angle: reflect_radial(ball.pos, hit_pos),
+            speed: ball.speed + 0.1,
+            ..ball
+        }
+        .clamp_angle()
     });
     (ball, blocks)
 }
