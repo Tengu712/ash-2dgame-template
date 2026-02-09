@@ -29,8 +29,8 @@ use submit::{SubmittedSubmitter, Submitter};
 use swapchain::Swapchain;
 use sync::Synchronizer;
 
-/// 文字テクスチャアトラスの一辺の長さ [px]
-pub const CHAR_ATLAS_SIZE: u32 = 512;
+/// 論理解像度における文字テクスチャアトラスの一辺の長さ [px]
+const CHAR_ATLAS_SIZE: u32 = 512;
 /// 文字テクスチャアトラスのチャンネル数
 //
 // NOTE: macOSではswizzleをゼロコストで使えないので、
@@ -52,6 +52,14 @@ pub const CHAR_ATLAS_COMPONENT_MAP: vk::ComponentMapping = if cfg!(target_os = "
 } else {
     R_COMPONENT_MAP
 };
+
+/// 文字テクスチャアトラスの一辺の長さを求める関数
+///
+/// NOTE: 特にmacOSで物理解像度と論理解像度を考慮する必要があるため。
+///       文字テクスチャアトラスのサイズは複数箇所で利用するため。
+pub fn calc_char_atlas_size(scale_factor: f32) -> u32 {
+    (CHAR_ATLAS_SIZE as f32 * scale_factor) as u32
+}
 
 enum SubmitterState {
     Idle(Submitter),
@@ -91,9 +99,7 @@ impl GraphicsEngine {
         let mut submitter_for_image = Submitter::new(&ctx);
         let mut images = HashMap::new();
 
-        // NOTE: 特にmacOSでは物理解像度と論理解像度が異なるので、
-        //       それを考慮して文字テクスチャアトラスのサイズをスケールアップさせる。
-        let char_atlas_size = (CHAR_ATLAS_SIZE as f32 * window.get_scale_factor()) as u32;
+        let char_atlas_size = calc_char_atlas_size(window.get_scale_factor());
         let char_atlas = OwnedImage::new(
             &ctx,
             char_atlas_size,

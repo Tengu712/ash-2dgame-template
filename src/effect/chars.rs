@@ -1,6 +1,6 @@
 use crate::{
     System,
-    graphics::{CHAR_ATLAS_CHANNEL_COUNT, CHAR_ATLAS_SIZE},
+    graphics::{self, CHAR_ATLAS_CHANNEL_COUNT},
     logs::*,
     res::FONT,
 };
@@ -18,14 +18,19 @@ const MARGIN: usize = 2;
 const MARGIN_AXIS: usize = MARGIN * 2;
 
 #[derive(Clone, Copy)]
-pub struct CharInfo {
-    alloc_id: AllocId,
-    pub width: f32,
-    pub height: f32,
-    pub x_offset: f32,
-    pub y_offset: f32,
-    pub advance: f32,
-    pub uv: Vec4,
+pub enum CharInfo {
+    Rasterizable {
+        alloc_id: AllocId,
+        width: f32,
+        height: f32,
+        x_offset: f32,
+        y_offset: f32,
+        advance: f32,
+        uv: Vec4,
+    },
+    Unrasterizable {
+        advance: f32,
+    },
 }
 
 pub type CharLruCache = LruCache<(char, u32), CharInfo>;
@@ -47,11 +52,10 @@ pub struct CharsManageState {
 
 impl CharsManageState {
     pub fn new(system: &System) -> Self {
-        // NOTE: 物理解像度と論理解像度の違いを考慮してスケールアップ。
-        let atlas_size = (CHAR_ATLAS_SIZE as f32 * system.window.get_scale_factor()) as i32;
+        let atlas_size = graphics::calc_char_atlas_size(system.window.get_scale_factor());
         Self {
             font: FontRef::try_from_slice(FONT).expect_log("failed to load a font"),
-            atlas: AtlasAllocator::new(etagere::size2(atlas_size, atlas_size)),
+            atlas: AtlasAllocator::new(etagere::size2(atlas_size as i32, atlas_size as i32)),
             registereds: LruCache::unbounded(),
         }
     }
@@ -103,7 +107,14 @@ impl CharsManageState {
         //
         // NOTE: 物理解像度と論理解像度の違いを考慮してスケールアップ。
         //       scaleをスケールアップすれば自ずとラスタライズ結果も比例してスケールアップされる。
-        let rasterized = rasterize_character(&self.font, c, scale as f32 * scale_factor);
+        let rasterized = match rasterize_character(&self.font, c, scale as f32 * scale_factor) {
+            Ok(n) => n,
+            Err(advance) => {
+                self.registereds
+                    .push((c, scale), CharInfo::Unrasterizable { advance });
+                return (self, system);
+            }
+        };
 
         // アロケート
         let size = etagere::size2(rasterized.width as i32, rasterized.height as i32);
@@ -115,7 +126,9 @@ impl CharsManageState {
                     .registereds
                     .pop_lru()
                     .expect("Internal error: no character exists but character atlas is full");
-                self.atlas.deallocate(least_used.1.alloc_id);
+                if let CharInfo::Rasterizable { alloc_id, .. } = least_used.1 {
+                    self.atlas.deallocate(alloc_id);
+                }
             }
         };
 
@@ -128,24 +141,23 @@ impl CharsManageState {
             rasterized.height,
         );
 
-        // スケールアップとマージンの除去
-        let x = (allocated.rectangle.min.x as f32 + MARGIN as f32) / scale_factor;
-        let y = (allocated.rectangle.min.y as f32 + MARGIN as f32) / scale_factor;
-        let width = (rasterized.width as f32 - MARGIN_AXIS as f32) / scale_factor;
-        let height = (rasterized.height as f32 - MARGIN_AXIS as f32) / scale_factor;
-        let x_offset = rasterized.x_offset / scale_factor;
-        let y_offset = rasterized.y_offset / scale_factor;
-        let advance = rasterized.advance / scale_factor;
-
         // 登録
-        let info = CharInfo {
+        let width = rasterized.width as f32 - MARGIN_AXIS as f32;
+        let height = rasterized.height as f32 - MARGIN_AXIS as f32;
+        let atlas_size = graphics::calc_char_atlas_size(scale_factor);
+        let info = CharInfo::Rasterizable {
             alloc_id: allocated.id,
-            width,
-            height,
-            x_offset,
-            y_offset,
-            advance,
-            uv: Vec4::new(x, y, width, height) / CHAR_ATLAS_SIZE as f32,
+            width: width / scale_factor,
+            height: height / scale_factor,
+            x_offset: rasterized.x_offset / scale_factor,
+            y_offset: rasterized.y_offset / scale_factor,
+            advance: rasterized.advance / scale_factor,
+            uv: Vec4::new(
+                allocated.rectangle.min.x as f32 + MARGIN as f32,
+                allocated.rectangle.min.y as f32 + MARGIN as f32,
+                width,
+                height,
+            ) / atlas_size as f32,
         };
         self.registereds.push((c, scale), info);
 
@@ -163,22 +175,23 @@ struct RasterizeCharRes {
     advance: f32,
 }
 
-fn rasterize_character(font: &FontRef<'static>, c: char, scale: f32) -> RasterizeCharRes {
+/// 文字をラスタライズする関数
+///
+/// ラスタライザブルでない文字に対してはadvanceと共に`Err`を返す。
+///
+/// 物理解像度と論理解像度の違いを考慮しない。
+/// 考慮したいなら`scale`を大きくすると良い。
+fn rasterize_character(
+    font: &FontRef<'static>,
+    c: char,
+    scale: f32,
+) -> Result<RasterizeCharRes, f32> {
     let font = font.as_scaled(scale);
     let glyph = font.scaled_glyph(c);
     let advance = font.h_advance(glyph.id);
 
     let Some(outlined_glyph) = font.outline_glyph(glyph) else {
-        let size = 4 + MARGIN_AXIS;
-        // TODO: これがすべての無効グリフに対してアップロードされるのは無駄なのでどうにかする。
-        return RasterizeCharRes {
-            data: vec![0x00; CHAR_ATLAS_CHANNEL_COUNT * size * size],
-            width: size as u32,
-            height: size as u32,
-            x_offset: 0.0,
-            y_offset: 0.0,
-            advance,
-        };
+        return Err(advance);
     };
 
     let width = outlined_glyph.px_bounds().width().ceil() as usize + MARGIN_AXIS;
@@ -200,12 +213,12 @@ fn rasterize_character(font: &FontRef<'static>, c: char, scale: f32) -> Rasteriz
         data[i] = (c * 255.0) as u8;
     });
 
-    RasterizeCharRes {
+    Ok(RasterizeCharRes {
         data,
         width: width as u32,
         height: height as u32,
         x_offset: outlined_glyph.px_bounds().min.x,
         y_offset: outlined_glyph.px_bounds().min.y,
         advance,
-    }
+    })
 }

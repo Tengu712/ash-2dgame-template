@@ -21,7 +21,7 @@ use std::vec::Drain;
 mod chars;
 mod texture;
 
-use chars::CharsManageState;
+use chars::{CharInfo, CharsManageState};
 use texture::TextureManageState;
 
 #[allow(unused)]
@@ -225,19 +225,33 @@ impl EffectProcessor {
                         (self.chars_state, info, system) =
                             self.chars_state.update(c, scale, system);
 
-                        let w = info.width * s;
-                        let h = info.height * s;
-                        let x = pp_x + w / 2.0 + info.x_offset * s;
-                        let y = pp_y + h / 2.0 + info.y_offset * s;
-                        self.instances.push(Instance {
-                            transform: Mat4::from_translation(Vec3::new(x, y, position.z))
-                                * Mat4::from_scale(Vec3::new(w, h, 1.0)),
-                            color,
-                            tex_id,
-                            uv: info.uv,
-                        });
-
-                        pp_x += info.advance * s;
+                        match info {
+                            CharInfo::Rasterizable {
+                                width,
+                                height,
+                                x_offset,
+                                y_offset,
+                                advance,
+                                uv,
+                                ..
+                            } => {
+                                let w = width * s;
+                                let h = height * s;
+                                let x = pp_x + w / 2.0 + x_offset * s;
+                                let y = pp_y + h / 2.0 + y_offset * s;
+                                self.instances.push(Instance {
+                                    transform: Mat4::from_translation(Vec3::new(x, y, position.z))
+                                        * Mat4::from_scale(Vec3::new(w, h, 1.0)),
+                                    color,
+                                    tex_id,
+                                    uv,
+                                });
+                                pp_x += advance * s;
+                            }
+                            CharInfo::Unrasterizable { advance } => {
+                                pp_x += advance * s;
+                            }
+                        }
                     }
 
                     // 各行を水平方向にアラインメント
