@@ -13,7 +13,7 @@ use std::{marker::PhantomData, ptr};
 ///
 /// NOTE: 1ドローコールで描画できる最大のインスタンス数。
 ///       ゲームに応じて適切に設定すること。
-const MAX_INSTANCE_COUNT: usize = 32;
+const MAX_INSTANCE_COUNT: usize = 64;
 
 /// このディスクリプタセットにおけるバインディング
 ///

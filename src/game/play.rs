@@ -165,7 +165,11 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
     // ゲームオーバ
     if ball.pos.y > VIRTUAL_HEIGHT || blocks.iter().all(|b| !b.alive) {
         let score = blocks.iter().filter(|b| !b.alive).count();
-        return result::update(result::init(score), istates, effects);
+        return result::update(
+            result::init(score, score == BLOCK_ROWS * BLOCK_COLS),
+            istates,
+            effects,
+        );
     }
 
     // バー

@@ -4,10 +4,11 @@ use glam::{Vec3, Vec4};
 
 pub struct States {
     score: usize,
+    conquered: bool,
 }
 
-pub fn init(score: usize) -> States {
-    States { score }
+pub fn init(score: usize, conquered: bool) -> States {
+    States { score, conquered }
 }
 
 pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) -> GameState {
@@ -24,6 +25,18 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
         line_height: 32.0,
         color: Vec4::new(1.0, 1.0, 1.0, 1.0),
     });
+
+    if states.conquered {
+        effects.push(Effect::DrawText {
+            scale: 24,
+            text: "Congratulations! You are amazing!".to_string(),
+            halign: TextHorizontalAlignment::Center,
+            valign: TextVerticalAlignment::Center,
+            position: Vec3::new(VIRTUAL_WIDTH_HALF, VIRTUAL_HEIGHT_HALF + 100.0, 0.0),
+            line_height: 24.0,
+            color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+        });
+    }
 
     GameState::Result(states)
 }
