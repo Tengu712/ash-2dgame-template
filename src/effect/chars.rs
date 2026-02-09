@@ -74,6 +74,16 @@ impl CharsManageState {
         self.font.as_scaled(scale as f32).line_gap()
     }
 
+    /// スケールされたフォントのカーニング量を取得するメソッド
+    ///
+    /// WARN: 物理解像度と論理解像度の違いを考慮しない。
+    ///       このメソッドの使い道ゆえ。
+    pub fn kern(&self, scale: u32, first: char, second: char) -> f32 {
+        let first = self.font.glyph_id(first);
+        let second = self.font.glyph_id(second);
+        self.font.as_scaled(scale as f32).kern(first, second)
+    }
+
     // NOTE: `scale`は`f32`でしか使われないが、
     //       `f32`は`Hash`を実装していないので`u32`で受け取る。
     pub fn update(mut self, c: char, scale: u32, mut system: System) -> (Self, CharInfo, System) {
@@ -160,6 +170,7 @@ fn rasterize_character(font: &FontRef<'static>, c: char, scale: f32) -> Rasteriz
 
     let Some(outlined_glyph) = font.outline_glyph(glyph) else {
         let size = 4 + MARGIN_AXIS;
+        // TODO: これがすべての無効グリフに対してアップロードされるのは無駄なのでどうにかする。
         return RasterizeCharRes {
             data: vec![0x00; CHAR_ATLAS_CHANNEL_COUNT * size * size],
             width: size as u32,

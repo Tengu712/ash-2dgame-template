@@ -205,7 +205,7 @@ impl EffectProcessor {
                     should_end = true;
                     let start_i = self.instances.len();
                     let mut pp_x = position.x;
-                    let mut max_x = pp_x;
+                    let mut prev = None;
 
                     // 各行のインスタンスデータ構築
                     for c in &mut chars {
@@ -214,6 +214,12 @@ impl EffectProcessor {
                             line_count += 1;
                             break;
                         }
+
+                        // カーニング考慮
+                        if let Some(prev) = prev {
+                            pp_x += self.chars_state.kern(scale, prev, c) * s;
+                        }
+                        prev = Some(c);
 
                         let info;
                         (self.chars_state, info, system) =
@@ -231,12 +237,11 @@ impl EffectProcessor {
                             uv: info.uv,
                         });
 
-                        max_x = x + w / 2.0;
                         pp_x += info.advance * s;
                     }
 
                     // 各行を水平方向にアラインメント
-                    halign.align(max_x - position.x, &mut self.instances[start_i..]);
+                    halign.align(pp_x - position.x, &mut self.instances[start_i..]);
 
                     // 改行
                     pp_y += line_height + line_gap;
