@@ -1,7 +1,7 @@
 use super::*;
 use crate::res::*;
 use glam::{Vec2, Vec3, Vec4};
-use std::f32::consts::{FRAC_PI_4, PI};
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI};
 
 const BAR_Y: f32 = 420.0;
 const BAR_SIZE: Vec2 = Vec2::new(80.0, 12.0);
@@ -64,7 +64,7 @@ impl Ball {
             angle = -angle;
         }
         if collides_point_rect(self.pos, bar.pos(), BAR_SIZE) {
-            angle = reflect_radial(self.pos, bar.pos());
+            angle = (self.pos.x - bar.x) / (BAR_SIZE.x / 2.0) * FRAC_PI_2 - FRAC_PI_2;
         }
         Self {
             pos: self.pos + Vec2::new(angle.cos(), angle.sin()) * BALL_SPEED,
