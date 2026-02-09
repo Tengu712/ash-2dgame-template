@@ -1,6 +1,7 @@
 use crate::{Effect, window::input::*};
 
 pub mod play;
+pub mod result;
 pub mod title;
 
 const VIRTUAL_WIDTH: f32 = 640.0;
@@ -11,6 +12,7 @@ const VIRTUAL_HEIGHT_HALF: f32 = VIRTUAL_HEIGHT / 2.0;
 pub enum GameState {
     Title(title::States),
     Play(play::States),
+    Result(result::States),
 }
 
 impl GameState {
@@ -18,6 +20,7 @@ impl GameState {
         match self {
             Self::Title(states) => title::update(states, istates, effects),
             Self::Play(states) => play::update(states, istates, effects),
+            Self::Result(states) => result::update(states, istates, effects),
         }
     }
 }
