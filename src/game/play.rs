@@ -8,7 +8,7 @@ const BAR_SIZE: Vec2 = Vec2::new(80.0, 12.0);
 const BAR_SPEED: f32 = 8.0;
 
 const BALL_SIZE: Vec2 = Vec2::new(10.0, 10.0);
-const BALL_SPEED: f32 = 5.0;
+const BALL_INITIAL_SPEED: f32 = 5.0;
 
 const BLOCK_ROWS: usize = 3;
 const BLOCK_COLS: usize = 5;
@@ -45,6 +45,7 @@ impl Bar {
 struct Ball {
     pos: Vec2,
     angle: f32,
+    speed: f32,
 }
 
 impl Ball {
@@ -52,23 +53,29 @@ impl Ball {
         Self {
             pos: Vec2::new(VIRTUAL_WIDTH_HALF, 312.0),
             angle: FRAC_PI_4,
+            speed: BALL_INITIAL_SPEED,
         }
     }
 
     fn update(self, bar: &Bar) -> Self {
         let mut angle = self.angle;
+        let mut speed = self.speed;
         if self.pos.x <= 0.0 || self.pos.x >= VIRTUAL_WIDTH {
             angle = PI - angle;
+            speed += 0.1;
         }
         if self.pos.y <= 0.0 {
             angle = -angle;
+            speed += 0.1;
         }
         if collides_point_rect(self.pos, bar.pos(), BAR_SIZE) {
             angle = (self.pos.x - bar.x) / (BAR_SIZE.x / 2.0) * FRAC_PI_2 - FRAC_PI_2;
+            speed += 0.1;
         }
         Self {
-            pos: self.pos + Vec2::new(angle.cos(), angle.sin()) * BALL_SPEED,
+            pos: self.pos + Vec2::new(angle.cos(), angle.sin()) * speed,
             angle,
+            speed,
         }
     }
 }
@@ -106,6 +113,7 @@ fn collide_ball_blocks(ball: Ball, mut blocks: Vec<Block>) -> (Ball, Vec<Block>)
     });
     let ball = hit_pos.map_or(ball, |hit_pos| Ball {
         angle: reflect_radial(ball.pos, hit_pos),
+        speed: ball.speed + 0.1,
         ..ball
     });
     (ball, blocks)
