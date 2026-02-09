@@ -24,6 +24,14 @@ mod texture;
 use chars::CharsManageState;
 use texture::TextureManageState;
 
+#[allow(unused)]
+pub enum TextAlignment {
+    Left,
+    Center,
+    Right,
+}
+
+#[allow(unused)]
 pub enum Effect {
     Draw {
         position: Vec3,
@@ -36,6 +44,7 @@ pub enum Effect {
         /// emスクエア高 [px]
         scale: u32,
         text: String,
+        align: TextAlignment,
         position: Vec3,
         /// 1行の見かけの高さ
         line_height: f32,
@@ -123,6 +132,7 @@ impl EffectProcessor {
             Effect::DrawText {
                 scale,
                 text,
+                align,
                 position,
                 line_height,
                 color,
@@ -130,29 +140,50 @@ impl EffectProcessor {
                 let tex_id;
                 (self.tex_state, tex_id) = self.tex_state.update(CHAR_ATLAS);
 
-                let mut x = position.x;
+                // `position`をペンポイントとして普通にインスタンスデータ構築
+                let mut pen_point = position.xy();
+                let mut max_xy = pen_point;
+                let start_i = self.instances.len();
+                let start_x = pen_point.x;
                 for c in text.chars() {
                     // TODO: 複数行に対応する。
-                    // TODO: アラインメントに対応する。
 
                     let info;
                     (self.chars_state, info, system) = self.chars_state.update(c, scale, system);
 
                     let s = line_height / scale as f32;
-                    let pos = Vec3::new(
-                        x + (info.x_offset + info.width / 2.0) * s,
-                        position.y + (info.y_offset + info.height / 2.0) * s,
-                        position.z,
+                    let xy = Vec2::new(
+                        pen_point.x + (info.x_offset + info.width / 2.0) * s,
+                        pen_point.y + (info.y_offset + info.height / 2.0) * s,
                     );
-                    let scl = Vec3::new(info.width * s, info.height * s, 1.0);
+                    let wh = Vec2::new(info.width * s, info.height * s);
                     self.instances.push(Instance {
-                        transform: Mat4::from_translation(pos) * Mat4::from_scale(scl),
+                        transform: Mat4::from_translation(xy.extend(position.z))
+                            * Mat4::from_scale(wh.extend(1.0)),
                         color,
                         tex_id,
                         uv: info.uv,
                     });
 
-                    x += info.advance * s;
+                    max_xy = max_xy.max(pen_point + wh);
+                    pen_point.x += info.advance * s;
+                }
+
+                // アラインメント
+                let cx = (start_x + max_xy.x) / 2.0;
+                let dx = position.x - cx;
+                match align {
+                    TextAlignment::Left => (),
+                    TextAlignment::Center => {
+                        for instance in &mut self.instances[start_i..] {
+                            instance.transform.w_axis.x += dx;
+                        }
+                    }
+                    TextAlignment::Right => {
+                        for instance in &mut self.instances[start_i..] {
+                            instance.transform.w_axis.x += dx * 2.0;
+                        }
+                    }
                 }
             }
 
