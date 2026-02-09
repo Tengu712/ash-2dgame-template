@@ -22,10 +22,6 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
         });
     }
 
-    if istates.get(Key::Return) == 1 {
-        return play::update(play::init(), istates, effects);
-    }
-
     effects.push(Effect::Draw {
         position: Vec3::new(VIRTUAL_WIDTH_HALF, VIRTUAL_HEIGHT_HALF - 50.0, 0.0),
         scaling: Vec2::new(512.0, 64.0),
@@ -42,6 +38,10 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
         line_height: 32.0,
         color: Vec4::new(1.0, 1.0, 1.0, 1.0),
     });
+
+    if istates.get(Key::Return) == 1 {
+        return GameState::Play(play::init());
+    }
 
     GameState::Title(States {
         count: states.count + 1,

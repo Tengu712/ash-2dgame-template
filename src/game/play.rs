@@ -162,16 +162,6 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
     let ball = states.ball.update(&bar);
     let (ball, blocks) = collide_ball_blocks(ball, states.blocks);
 
-    // ゲームオーバ
-    if ball.pos.y > VIRTUAL_HEIGHT || blocks.iter().all(|b| !b.alive) {
-        let score = blocks.iter().filter(|b| !b.alive).count();
-        return result::update(
-            result::init(score, score == BLOCK_ROWS * BLOCK_COLS),
-            istates,
-            effects,
-        );
-    }
-
     // バー
     effects.push(Effect::Draw {
         position: Vec3::new(bar.x, BAR_Y, 0.0),
@@ -198,6 +188,12 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
             uv: UV_WHITE,
         })
     });
+
+    // ゲームオーバ
+    if ball.pos.y > VIRTUAL_HEIGHT || blocks.iter().all(|b| !b.alive) {
+        let score = blocks.iter().filter(|b| !b.alive).count();
+        return GameState::Result(result::init(score, score == BLOCK_ROWS * BLOCK_COLS));
+    }
 
     GameState::Play(States { bar, ball, blocks })
 }

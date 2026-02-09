@@ -12,10 +12,6 @@ pub fn init(score: usize, conquered: bool) -> States {
 }
 
 pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) -> GameState {
-    if istates.get(Key::Return) == 1 {
-        return title::update(title::init(), istates, effects);
-    }
-
     effects.push(Effect::DrawText {
         scale: 32,
         text: format!("You broke {} bricks!", states.score),
@@ -36,6 +32,10 @@ pub fn update(states: States, istates: &InputStates, effects: &mut Vec<Effect>) 
             line_height: 24.0,
             color: Vec4::new(1.0, 1.0, 1.0, 1.0),
         });
+    }
+
+    if istates.get(Key::Return) == 1 {
+        return GameState::Title(title::init());
     }
 
     GameState::Result(states)
