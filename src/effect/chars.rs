@@ -160,6 +160,7 @@ fn rasterize_character(font: &FontRef<'static>, c: char, scale: f32) -> Rasteriz
     outlined_glyph.draw(|x, y, c| {
         let x = x as usize + MARGIN;
         let y = y as usize + MARGIN;
+        #[allow(unused_mut)]
         let mut i = CHAR_ATLAS_CHANNEL_COUNT * width * y + CHAR_ATLAS_CHANNEL_COUNT * x;
 
         // NOTE: macOSでは4チャンネル分更新する。
