@@ -1,17 +1,11 @@
 # ash-2dgame-template
 
-<div style="width=100%; text-align: center">
-  <img src="./screenshot.png" style="width=75%">
-</div>
-
-## What's this?
+<p align="center">
+  <img src="./screenshot.png" width="50%" />
+</p>
 
 Rustのashを使った2Dゲーム向けのテンプレートコードです。
 主にashを使うときのボイラープレートを提供することを目的としています。
-
-> [!WARNING]
-> マルチスレッドに対応していません。
-> マルチスレッドで動作させる場合は多くの箇所に修正が必要です。
 
 ## Build
 
