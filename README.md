@@ -1,11 +1,26 @@
 # ash-2dgame-template
 
 <p align="center">
-  <img src="./screenshot.png" width="50%" />
+  <img src="./screenshot.png" width="60%" />
 </p>
 
 Rustのashを使った2Dゲーム向けのテンプレートコードです。
 主にashを使うときのボイラープレートを提供することを目的としています。
+
+以下の機能を実装しています:
+
+- Windows, macOS, Linuxでの動作
+- インスタンシング
+- テキストレンダリング
+- フルスクリーン (アスペクト比固定)
+
+## Next Steps
+
+このリポジトリが実装していない機能として次が挙げられます:
+
+- オーディオ再生
+- マウス・コントローラ入力
+- セーブ・コンフィグデータ関連
 
 ## Build
 
