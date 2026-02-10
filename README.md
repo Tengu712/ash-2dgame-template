@@ -1,5 +1,9 @@
 # ash-2dgame-template
 
+<div style="width=100%; text-align: center">
+  <img src="./screenshot.png" style="width=75%">
+</div>
+
 ## What's this?
 
 Rustのashを使った2Dゲーム向けのテンプレートコードです。
